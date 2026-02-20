@@ -97,7 +97,7 @@ SDD-Hoffy doesn't replace plan mode. It makes plan mode **dramatically better** 
 | **Interface** | MCP server (works in ANY AI tool) | Standalone CLI |
 | **LLM config** | Zero — your AI tool handles it | API keys, env vars |
 | **Compatibility** | Claude Code, Gemini CLI, Codex, Cursor, VS Code Copilot, OpenCode | Single tool only |
-| **Install** | One binary, 3 lines of config | npm/pip, dependencies |
+| **Install** | One-liner install + auto-update | npm/pip, dependencies |
 | **Dual mode** | Guided (beginners) + Expert (devs) | One size fits all |
 | **Full pipeline** | Idea → Specs → Architecture → Tasks → Validation | Specs only |
 
@@ -107,29 +107,35 @@ SDD-Hoffy doesn't replace plan mode. It makes plan mode **dramatically better** 
 
 ### 1. Install
 
+**One-liner (recommended):**
+
 ```bash
-# Option A: Go install (requires Go 1.25+)
+curl -sSL https://raw.githubusercontent.com/HendryAvila/sdd-hoffy/main/install.sh | bash
+```
+
+This detects your OS/architecture, downloads the latest binary, installs it, and walks you through configuring your AI tool — no Go required.
+
+> **Tip:** If you prefer an interactive install (to answer MCP config questions), run:
+> ```bash
+> bash <(curl -sSL https://raw.githubusercontent.com/HendryAvila/sdd-hoffy/main/install.sh)
+> ```
+
+<details>
+<summary><strong>Other installation methods</strong></summary>
+
+```bash
+# Go install (requires Go 1.25+)
 go install github.com/HendryAvila/sdd-hoffy/cmd/sdd-hoffy@latest
 
-# Option B: Download binary (no Go required)
-# Download the latest release for your platform from:
-# https://github.com/HendryAvila/sdd-hoffy/releases
-#
-# Linux (amd64):
-curl -Lo sdd-hoffy.tar.gz https://github.com/HendryAvila/sdd-hoffy/releases/latest/download/sdd-hoffy_linux_amd64.tar.gz
-tar xzf sdd-hoffy.tar.gz
-sudo mv sdd-hoffy /usr/local/bin/
-
-# macOS (Apple Silicon):
-curl -Lo sdd-hoffy.tar.gz https://github.com/HendryAvila/sdd-hoffy/releases/latest/download/sdd-hoffy_darwin_arm64.tar.gz
-tar xzf sdd-hoffy.tar.gz
-sudo mv sdd-hoffy /usr/local/bin/
-
-# Option C: Build from source
+# Build from source
 git clone https://github.com/HendryAvila/sdd-hoffy.git
 cd sdd-hoffy
 make build
+
+# Manual download (pick your platform)
+# https://github.com/HendryAvila/sdd-hoffy/releases
 ```
+</details>
 
 ### 2. Configure your AI tool
 
@@ -225,6 +231,16 @@ Just talk to your AI tool:
 The AI will use SDD-Hoffy's tools to guide you through the full pipeline. Or use the prompt directly:
 
 > `/sdd-start`
+
+### 4. Keep it updated
+
+SDD-Hoffy checks for updates automatically when you start the server and shows a non-intrusive notice if a new version is available. To update:
+
+```bash
+sdd-hoffy update
+```
+
+No auto-restarts, no surprises — you decide when to update.
 
 ---
 
@@ -467,6 +483,8 @@ make lint
 - [x] CI/CD pipeline (GitHub Actions + GoReleaser)
 - [x] Multi-platform binary releases (Linux, macOS, Windows)
 - [x] Cross-artifact validation with PASS/WARN/FAIL verdicts
+- [x] One-liner install script with MCP configuration wizard
+- [x] Self-update system (`sdd-hoffy update`)
 - [ ] Streamable HTTP transport (for remote server deployment)
 - [ ] Template customization (bring your own templates)
 - [ ] Project presets (web app, API, CLI, mobile, etc.)

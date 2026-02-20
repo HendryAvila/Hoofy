@@ -7,6 +7,7 @@
 // Usage:
 //
 //	sdd-hoffy serve    # Start MCP server (stdio transport)
+//	sdd-hoffy update   # Update to the latest version
 package main
 
 import (
@@ -17,6 +18,7 @@ import (
 	"syscall"
 
 	sddserver "github.com/HendryAvila/sdd-hoffy/internal/server"
+	"github.com/HendryAvila/sdd-hoffy/internal/updater"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -32,6 +34,8 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+	case "update":
+		runUpdate()
 	case "--help", "-h", "help":
 		printUsage()
 		os.Exit(0)
@@ -51,6 +55,10 @@ func run() error {
 		return fmt.Errorf("creating server: %w", err)
 	}
 
+	// Background version check — prints to stderr so it doesn't
+	// interfere with MCP's stdio transport on stdout.
+	go checkForUpdates()
+
 	// Graceful shutdown on interrupt.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -68,11 +76,50 @@ func run() error {
 	return server.ServeStdio(s)
 }
 
+// checkForUpdates runs a non-blocking version check and prints a notice
+// to stderr if an update is available. This runs in a goroutine during
+// "serve" and is best-effort — network failures are silently ignored.
+func checkForUpdates() {
+	result := updater.CheckVersion(sddserver.Version)
+	if result.UpdateAvailable {
+		fmt.Fprintf(os.Stderr,
+			"\n  📦 Update available: v%s → v%s\n"+
+				"     Run: sdd-hoffy update\n"+
+				"     Release: %s\n\n",
+			result.CurrentVersion, result.LatestVersion, result.ReleaseURL,
+		)
+	}
+}
+
+// runUpdate performs a self-update to the latest version.
+func runUpdate() {
+	fmt.Fprintf(os.Stderr, "🔍 Checking for updates...\n")
+
+	result := updater.CheckVersion(sddserver.Version)
+	if !result.UpdateAvailable {
+		fmt.Fprintf(os.Stderr, "✅ Already at the latest version (v%s)\n", result.CurrentVersion)
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "📦 New version available: v%s → v%s\n", result.CurrentVersion, result.LatestVersion)
+	fmt.Fprintf(os.Stderr, "⬇️  Downloading...\n")
+
+	if err := updater.SelfUpdate(sddserver.Version); err != nil {
+		fmt.Fprintf(os.Stderr, "❌ Update failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\n   You can download manually from:\n   %s\n", result.ReleaseURL)
+		os.Exit(1)
+	}
+
+	fmt.Fprintf(os.Stderr, "✅ Updated to v%s!\n", result.LatestVersion)
+	fmt.Fprintf(os.Stderr, "   Restart sdd-hoffy to use the new version.\n")
+}
+
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `SDD-Hoffy v%s — Spec-Driven Development MCP Server
 
 Usage:
   sdd-hoffy serve    Start the MCP server (stdio transport)
+  sdd-hoffy update   Update to the latest version
 
 Configuration:
   Add to your AI tool's MCP config:
