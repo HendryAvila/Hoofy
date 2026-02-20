@@ -12,6 +12,12 @@
 
 set -euo pipefail
 
+# Wrap everything in a function so bash reads the ENTIRE script from
+# the pipe before executing anything. Without this, `exec < /dev/tty`
+# would cut the pipe mid-read and curl would fail with
+# "failure writing output to destination".
+_sdd_hoffy_install() {
+
 # --- Colors and formatting ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -24,7 +30,7 @@ NC='\033[0m' # No Color
 
 # --- Interactive input ---
 # When running via curl | bash, stdin is the script itself.
-# Reopen /dev/tty so we can ask the user questions regardless.
+# Reopen /dev/tty so we can ask the user questions.
 if [ ! -t 0 ] && [ -e /dev/tty ]; then
     exec < /dev/tty
 fi
@@ -499,3 +505,8 @@ main() {
 }
 
 main "$@"
+
+} # end _sdd_hoffy_install
+
+# Call the wrapper — by this point bash has read the entire script.
+_sdd_hoffy_install "$@"
