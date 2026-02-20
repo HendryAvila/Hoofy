@@ -12,12 +12,6 @@
 
 set -euo pipefail
 
-# Wrap everything in a function so bash reads the ENTIRE script from
-# the pipe before executing anything. Without this, `exec < /dev/tty`
-# would cut the pipe mid-read and curl would fail with
-# "failure writing output to destination".
-_sdd_hoffy_install() {
-
 # --- Colors and formatting ---
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,13 +21,6 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m' # No Color
-
-# --- Interactive input ---
-# When running via curl | bash, stdin is the script itself.
-# Reopen /dev/tty so we can ask the user questions.
-if [ ! -t 0 ] && [ -e /dev/tty ]; then
-    exec < /dev/tty
-fi
 
 # --- Helper functions ---
 
@@ -55,6 +42,12 @@ error() {
 
 step() {
     printf "\n${BOLD}${CYAN}▸ %s${NC}\n" "$1"
+}
+
+# Read user input — always from /dev/tty so it works even when
+# the script itself is piped via curl | bash.
+prompt_read() {
+    read -r "$@" </dev/tty
 }
 
 # --- Banner ---
@@ -258,7 +251,7 @@ configure_mcp() {
 
     local choice
     printf "  Enter your choice ${DIM}[1-6]${NC}: "
-    read -r choice
+    prompt_read choice
 
     case "$choice" in
         1) configure_claude_code ;;
@@ -289,12 +282,6 @@ add_mcp_server_to_config() {
 
     # Create directory if needed
     mkdir -p "$config_dir"
-
-    local sdd_entry
-    sdd_entry=$(cat <<'ENTRY'
-{"command":"sdd-hoffy","args":["serve"]}
-ENTRY
-)
 
     if [ -f "$config_file" ]; then
         # File exists — check if sdd-hoffy is already configured
@@ -376,7 +363,9 @@ configure_vscode_copilot() {
     printf "  VS Code MCP config is ${BOLD}per-project${NC}.\n"
     printf "  Create the config in your current directory? ${DIM}(%s)${NC}\n" "$(pwd)"
     printf "  ${DIM}[Y/n]${NC}: "
-    read -r yn
+
+    local yn
+    prompt_read yn
 
     case "$yn" in
         [Nn]*)
@@ -505,8 +494,3 @@ main() {
 }
 
 main "$@"
-
-} # end _sdd_hoffy_install
-
-# Call the wrapper — by this point bash has read the entire script.
-_sdd_hoffy_install "$@"
