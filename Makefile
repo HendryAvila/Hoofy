@@ -15,9 +15,9 @@ build:
 test:
 	go test -race -cover ./...
 
-## lint: Run go vet
+## lint: Run linters (golangci-lint)
 lint:
-	go vet ./...
+	golangci-lint run ./...
 
 ## clean: Remove build artifacts
 clean:

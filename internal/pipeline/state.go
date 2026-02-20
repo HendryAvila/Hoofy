@@ -131,5 +131,5 @@ func markInProgress(cfg *config.ProjectConfig, stage config.Stage) {
 }
 
 func now() string {
-	return fmt.Sprintf("%s", timeNow().UTC().Format("2006-01-02T15:04:05Z07:00"))
+	return timeNow().UTC().Format("2006-01-02T15:04:05Z07:00")
 }

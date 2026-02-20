@@ -116,7 +116,7 @@ func (t *ClarifyTool) generateQuestions(
 
 	var sb strings.Builder
 	sb.WriteString("# Clarity Gate Analysis\n\n")
-	sb.WriteString(fmt.Sprintf("**Mode:** %s | **Threshold:** %d/100\n\n", cfg.Mode, threshold))
+	fmt.Fprintf(&sb, "**Mode:** %s | **Threshold:** %d/100\n\n", cfg.Mode, threshold)
 	sb.WriteString("## Requirements Under Analysis\n\n")
 	sb.WriteString(requirements)
 	sb.WriteString("\n\n---\n\n")
@@ -125,8 +125,8 @@ func (t *ClarifyTool) generateQuestions(
 	sb.WriteString("For each dimension with gaps, generate 1-2 specific, answerable questions.\n\n")
 
 	for _, d := range dimensions {
-		sb.WriteString(fmt.Sprintf("### %s (weight: %d/10)\n", d.Name, d.Weight))
-		sb.WriteString(fmt.Sprintf("%s\n\n", d.Description))
+		fmt.Fprintf(&sb, "### %s (weight: %d/10)\n", d.Name, d.Weight)
+		fmt.Fprintf(&sb, "%s\n\n", d.Description)
 	}
 
 	sb.WriteString("---\n\n")

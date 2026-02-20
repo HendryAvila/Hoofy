@@ -39,7 +39,7 @@ func setupTestProject(t *testing.T, mode config.Mode) (string, func()) {
 	}
 
 	cleanup := func() {
-		os.Chdir(origDir)
+		_ = os.Chdir(origDir)
 	}
 
 	return tmpDir, cleanup
@@ -74,18 +74,6 @@ func setupTestProjectAtStage(t *testing.T, mode config.Mode, stage config.Stage)
 	return tmpDir, cleanup
 }
 
-// makeCallToolRequest creates a minimal MCP CallToolRequest with string args.
-func makeCallToolRequest(args map[string]string) mcp.CallToolRequest {
-	params := make(map[string]interface{})
-	for k, v := range args {
-		params[k] = v
-	}
-
-	req := mcp.CallToolRequest{}
-	req.Params.Arguments = params
-	return req
-}
-
 // isErrorResult checks if the result is a tool error.
 func isErrorResult(result *mcp.CallToolResult) bool {
 	return result != nil && result.IsError
@@ -109,8 +97,10 @@ func getResultText(result *mcp.CallToolResult) string {
 func TestInitTool_Handle_Success(t *testing.T) {
 	tmpDir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir to tmpDir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	store := config.NewFileStore()
 	tool := NewInitTool(store)
@@ -154,8 +144,10 @@ func TestInitTool_Handle_Success(t *testing.T) {
 func TestInitTool_Handle_MissingName(t *testing.T) {
 	tmpDir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir to tmpDir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	store := config.NewFileStore()
 	tool := NewInitTool(store)
@@ -177,8 +169,10 @@ func TestInitTool_Handle_MissingName(t *testing.T) {
 func TestInitTool_Handle_MissingDescription(t *testing.T) {
 	tmpDir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir to tmpDir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	store := config.NewFileStore()
 	tool := NewInitTool(store)
@@ -200,8 +194,10 @@ func TestInitTool_Handle_MissingDescription(t *testing.T) {
 func TestInitTool_Handle_InvalidMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir to tmpDir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	store := config.NewFileStore()
 	tool := NewInitTool(store)
@@ -254,8 +250,10 @@ func TestInitTool_Handle_AlreadyExists(t *testing.T) {
 func TestInitTool_Handle_ExpertMode(t *testing.T) {
 	tmpDir := t.TempDir()
 	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("chdir to tmpDir: %v", err)
+	}
+	defer func() { _ = os.Chdir(origDir) }()
 
 	store := config.NewFileStore()
 	tool := NewInitTool(store)
@@ -449,7 +447,9 @@ func TestSpecifyTool_Handle_Success(t *testing.T) {
 
 	// Write a proposal file (required by specify).
 	proposalPath := config.StagePath(tmpDir, config.StagePropose)
-	writeStageFile(proposalPath, "# Test Proposal\n\nThis is a test proposal with some requirements.")
+	if err := writeStageFile(proposalPath, "# Test Proposal\n\nThis is a test proposal with some requirements."); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -488,7 +488,9 @@ func TestSpecifyTool_Handle_MissingRequiredFields(t *testing.T) {
 	defer cleanup()
 
 	proposalPath := config.StagePath(tmpDir, config.StagePropose)
-	writeStageFile(proposalPath, "# Test Proposal\n\nSome content here.")
+	if err := writeStageFile(proposalPath, "# Test Proposal\n\nSome content here."); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -565,7 +567,9 @@ func TestSpecifyTool_Handle_AdvancesPipeline(t *testing.T) {
 	defer cleanup()
 
 	proposalPath := config.StagePath(tmpDir, config.StagePropose)
-	writeStageFile(proposalPath, "# Test Proposal\n\nSome content here.")
+	if err := writeStageFile(proposalPath, "# Test Proposal\n\nSome content here."); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -594,7 +598,9 @@ func TestSpecifyTool_Handle_OptionalFieldsDefault(t *testing.T) {
 	defer cleanup()
 
 	proposalPath := config.StagePath(tmpDir, config.StagePropose)
-	writeStageFile(proposalPath, "# Test Proposal\n\nSome content here.")
+	if err := writeStageFile(proposalPath, "# Test Proposal\n\nSome content here."); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -627,7 +633,9 @@ func TestClarifyTool_Handle_GenerateQuestions(t *testing.T) {
 
 	// Write requirements.
 	reqPath := config.StagePath(tmpDir, config.StageSpecify)
-	writeStageFile(reqPath, "# Requirements\n\n- FR-001: Users can sign up")
+	if err := writeStageFile(reqPath, "# Requirements\n\n- FR-001: Users can sign up"); err != nil {
+		t.Fatalf("write requirements: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -659,7 +667,9 @@ func TestClarifyTool_Handle_ProcessAnswers_GatePassed(t *testing.T) {
 	defer cleanup()
 
 	reqPath := config.StagePath(tmpDir, config.StageSpecify)
-	writeStageFile(reqPath, "# Requirements\n\n- FR-001: Users can sign up")
+	if err := writeStageFile(reqPath, "# Requirements\n\n- FR-001: Users can sign up"); err != nil {
+		t.Fatalf("write requirements: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -697,7 +707,9 @@ func TestClarifyTool_Handle_ProcessAnswers_GateNotPassed(t *testing.T) {
 	defer cleanup()
 
 	reqPath := config.StagePath(tmpDir, config.StageSpecify)
-	writeStageFile(reqPath, "# Requirements\n\n- FR-001: Users can sign up")
+	if err := writeStageFile(reqPath, "# Requirements\n\n- FR-001: Users can sign up"); err != nil {
+		t.Fatalf("write requirements: %v", err)
+	}
 
 	store := config.NewFileStore()
 	renderer, _ := templates.NewRenderer()
@@ -785,7 +797,9 @@ func TestContextTool_Handle_SpecificStage(t *testing.T) {
 
 	// Write a proposal file.
 	proposalPath := config.StagePath(tmpDir, config.StagePropose)
-	writeStageFile(proposalPath, "# My Proposal\n\nThis is the proposal content.")
+	if err := writeStageFile(proposalPath, "# My Proposal\n\nThis is the proposal content."); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
 
 	store := config.NewFileStore()
 	tool := NewContextTool(store)

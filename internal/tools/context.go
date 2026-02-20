@@ -88,20 +88,20 @@ func (t *ContextTool) readStageContent(cfg *config.ProjectConfig, projectRoot st
 func (t *ContextTool) buildOverview(cfg *config.ProjectConfig, projectRoot string) (*mcp.CallToolResult, error) {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# SDD Project: %s\n\n", cfg.Name))
-	sb.WriteString(fmt.Sprintf("**Description:** %s\n", cfg.Description))
-	sb.WriteString(fmt.Sprintf("**Mode:** %s\n", cfg.Mode))
-	sb.WriteString(fmt.Sprintf("**Created:** %s\n", cfg.CreatedAt))
-	sb.WriteString(fmt.Sprintf("**Last Updated:** %s\n\n", cfg.UpdatedAt))
+	fmt.Fprintf(&sb, "# SDD Project: %s\n\n", cfg.Name)
+	fmt.Fprintf(&sb, "**Description:** %s\n", cfg.Description)
+	fmt.Fprintf(&sb, "**Mode:** %s\n", cfg.Mode)
+	fmt.Fprintf(&sb, "**Created:** %s\n", cfg.CreatedAt)
+	fmt.Fprintf(&sb, "**Last Updated:** %s\n\n", cfg.UpdatedAt)
 
 	// Pipeline status.
 	currentMeta := config.Stages[cfg.CurrentStage]
-	sb.WriteString(fmt.Sprintf("## Current Stage: %s (%s)\n\n", currentMeta.Name, cfg.CurrentStage))
-	sb.WriteString(fmt.Sprintf("_%s_\n\n", currentMeta.Description))
+	fmt.Fprintf(&sb, "## Current Stage: %s (%s)\n\n", currentMeta.Name, cfg.CurrentStage)
+	fmt.Fprintf(&sb, "_%s_\n\n", currentMeta.Description)
 
 	if cfg.CurrentStage == config.StageClarify {
-		sb.WriteString(fmt.Sprintf("**Clarity Score:** %d/100 (need %d for %s mode)\n\n",
-			cfg.ClarityScore, clarityThresholdForMode(cfg.Mode), cfg.Mode))
+		fmt.Fprintf(&sb, "**Clarity Score:** %d/100 (need %d for %s mode)\n\n",
+			cfg.ClarityScore, clarityThresholdForMode(cfg.Mode), cfg.Mode)
 	}
 
 	// Stage overview table.
@@ -117,8 +117,8 @@ func (t *ContextTool) buildOverview(cfg *config.ProjectConfig, projectRoot strin
 		if stage == cfg.CurrentStage {
 			current = " **← current**"
 		}
-		sb.WriteString(fmt.Sprintf("| %s %s | %s%s | %d |\n",
-			indicator, meta.Name, status.Status, current, status.Iterations))
+		fmt.Fprintf(&sb, "| %s %s | %s%s | %d |\n",
+			indicator, meta.Name, status.Status, current, status.Iterations)
 	}
 
 	// Artifacts summary.
@@ -142,8 +142,8 @@ func (t *ContextTool) buildOverview(cfg *config.ProjectConfig, projectRoot strin
 			exists = fmt.Sprintf("%d lines", lines)
 		}
 		meta := config.Stages[stage]
-		sb.WriteString(fmt.Sprintf("- **%s** (`sdd/%s`): %s\n",
-			meta.Name, config.StageFilename(stage), exists))
+		fmt.Fprintf(&sb, "- **%s** (`sdd/%s`): %s\n",
+			meta.Name, config.StageFilename(stage), exists)
 	}
 
 	// Next steps.
