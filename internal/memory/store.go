@@ -199,7 +199,7 @@ type Config struct {
 func DefaultConfig() Config {
 	home, _ := os.UserHomeDir()
 	return Config{
-		DataDir:              filepath.Join(home, ".sdd-hoffy"),
+		DataDir:              filepath.Join(home, ".hoofy"),
 		MaxObservationLength: 2000,
 		MaxContextResults:    20,
 		MaxSearchResults:     20,
