@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/HendryAvila/sdd-hoffy/internal/changes"
 	"github.com/HendryAvila/sdd-hoffy/internal/config"
 	"github.com/HendryAvila/sdd-hoffy/internal/memory"
 )
@@ -74,6 +75,65 @@ func notifyObserver(obs StageObserver, projectName string, stage config.Stage, c
 		return
 	}
 	obs.OnStageComplete(projectName, stage, content)
+}
+
+// ChangeObserver is notified when a change pipeline stage completes.
+// It's an optional dependency — tools work fine with a nil observer.
+type ChangeObserver interface {
+	// OnChangeStageComplete is called after a change stage artifact has been
+	// written to disk and the pipeline has advanced. changeID identifies the
+	// change, stage identifies which stage completed, and content is the
+	// rendered artifact (markdown) that was saved.
+	OnChangeStageComplete(changeID string, stage changes.ChangeStage, content string)
+}
+
+// OnChangeStageComplete saves a compact summary of the completed change stage
+// to memory. Uses topic_key "change/{project}/{change-id}/{stage}" for upserts.
+//
+// Best-effort: memory save failures are logged but don't propagate.
+func (b *MemoryBridge) OnChangeStageComplete(changeID string, stage changes.ChangeStage, content string) {
+	projectSlug := "unknown"
+	// Use changeID as the project context for the topic_key.
+	topicKey := fmt.Sprintf("change/%s/%s/%s", projectSlug, changeID, stage)
+	title := fmt.Sprintf("Change %s: %s", stage, changeID)
+
+	summary := fmt.Sprintf("**Stage**: %s completed for change `%s`\n\n", stage, changeID)
+	const maxLen = 500
+	remaining := maxLen - len(summary)
+	if remaining > 0 {
+		if len(content) <= remaining {
+			summary += content
+		} else {
+			truncated := content[:remaining]
+			if lastNewline := strings.LastIndex(truncated, "\n"); lastNewline > remaining/2 {
+				truncated = truncated[:lastNewline]
+			}
+			summary += truncated + "\n\n[...truncated]"
+		}
+	}
+
+	_ = b.store.CreateSession("manual-save", "", "")
+
+	_, err := b.store.AddObservation(memory.AddObservationParams{
+		SessionID: "manual-save",
+		Type:      "decision",
+		Title:     title,
+		Content:   summary,
+		Scope:     "project",
+		TopicKey:  topicKey,
+	})
+	if err != nil {
+		log.Printf("WARNING: change bridge: save %s stage for %q: %v", stage, changeID, err)
+	}
+}
+
+// notifyChangeObserver is a nil-safe helper called from change tool Handle methods.
+// If observer is nil, this is a no-op.
+func notifyChangeObserver(obs ChangeObserver, changeID string, stage changes.ChangeStage, content string) {
+	if obs == nil {
+		return
+	}
+	obs.OnChangeStageComplete(changeID, stage, content)
 }
 
 // normalizeProject converts a project name to a lowercase slug suitable

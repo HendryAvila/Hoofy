@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/HendryAvila/sdd-hoffy/internal/changes"
 	"github.com/HendryAvila/sdd-hoffy/internal/config"
 	"github.com/HendryAvila/sdd-hoffy/internal/memory"
 	"github.com/HendryAvila/sdd-hoffy/internal/memtools"
@@ -77,6 +78,26 @@ func New() (*server.MCPServer, func(), error) {
 	contextTool := tools.NewContextTool(store)
 	s.AddTool(contextTool.Definition(), contextTool.Handle)
 
+	// --- Register change pipeline tools ---
+	//
+	// The change pipeline is independent from the project pipeline —
+	// it works without sdd.json. It uses its own FileStore for
+	// persistence under sdd/changes/.
+
+	changeStore := changes.NewFileStore()
+
+	changeTool := tools.NewChangeTool(changeStore)
+	s.AddTool(changeTool.Definition(), changeTool.Handle)
+
+	changeAdvanceTool := tools.NewChangeAdvanceTool(changeStore)
+	s.AddTool(changeAdvanceTool.Definition(), changeAdvanceTool.Handle)
+
+	changeStatusTool := tools.NewChangeStatusTool(changeStore)
+	s.AddTool(changeStatusTool.Definition(), changeStatusTool.Handle)
+
+	adrTool := tools.NewADRTool(changeStore)
+	s.AddTool(adrTool.Definition(), adrTool.Handle)
+
 	// --- Register memory tools ---
 	//
 	// Memory is an independent subsystem: if it fails to initialize,
@@ -109,6 +130,11 @@ func New() (*server.MCPServer, func(), error) {
 		designTool.SetBridge(bridge)
 		tasksTool.SetBridge(bridge)
 		validateTool.SetBridge(bridge)
+
+		// Wire change pipeline bridge — saves stage completions and ADRs
+		// to memory for cross-session awareness.
+		changeAdvanceTool.SetBridge(bridge)
+		adrTool.SetBridge(bridge)
 	}
 
 	// --- Register prompts ---
@@ -205,6 +231,9 @@ You do NOT need to activate SDD-Hoffy for:
 - Refactoring existing code without changing behavior
 - Questions, explanations, or documentation
 - One-liner changes or config tweaks
+
+For bug fixes, refactors, enhancements, and small features, use the
+ADAPTIVE CHANGE PIPELINE instead (see below).
 
 ## What is SDD?
 Spec-Driven Development reduces AI hallucinations by forcing clear specifications 
@@ -351,5 +380,69 @@ This helps future sessions understand context without the user repeating themsel
 1. Start with mem_context for recent observations
 2. Use mem_search for specific topics
 3. Use mem_timeline to see chronological context around a search result
-4. Use mem_get_observation to read the full, untruncated content`
+4. Use mem_get_observation to read the full, untruncated content
+
+## ADAPTIVE CHANGE PIPELINE
+
+For ongoing development (features, fixes, refactors, enhancements), use the
+adaptive change pipeline instead of the full 7-stage SDD pipeline.
+
+### When to Use Changes vs Full Pipeline
+- **Full pipeline** (sdd_init_project): Brand new projects from scratch
+- **Change pipeline** (sdd_change): Any modification to an existing codebase
+
+### How It Works
+Each change has a TYPE and SIZE that determine the pipeline stages:
+
+**Types**: feature, fix, refactor, enhancement
+**Sizes**: small (3 stages), medium (4 stages), large (5-6 stages)
+
+### Stage Flows by Type and Size
+
+**Fix**: 
+- small: describe → tasks → verify
+- medium: describe → spec → tasks → verify
+- large: describe → spec → design → tasks → verify
+
+**Feature**:
+- small: describe → tasks → verify
+- medium: propose → spec → tasks → verify
+- large: propose → spec → clarify → design → tasks → verify
+
+**Refactor**:
+- small: scope → tasks → verify
+- medium: scope → design → tasks → verify
+- large: scope → spec → design → tasks → verify
+
+**Enhancement**:
+- small: describe → tasks → verify
+- medium: propose → spec → tasks → verify
+- large: propose → spec → clarify → design → tasks → verify
+
+### Change Pipeline Workflow
+
+1. **Create a change**: Call sdd_change with type, size, and description
+   - Only ONE active change at a time
+   - The tool creates a directory at sdd/changes/<slug>/
+
+2. **Work through stages**: For each stage, generate content and call
+   sdd_change_advance with the content
+   - The tool writes the content as <stage>.md in the change directory
+   - It advances the state machine to the next stage
+   - When the final stage (verify) is completed, the change is marked done
+
+3. **Check progress**: Call sdd_change_status to see the current state,
+   stage progress, artifact sizes, and ADRs
+
+4. **Capture decisions**: Call sdd_adr at any time to record an
+   Architecture Decision Record
+   - With active change: saves ADR file + updates change record
+   - Without active change: saves to memory only (standalone ADR)
+
+### Important Rules
+- Only ONE active change at a time
+- Complete or archive a change before starting a new one
+- Generate REAL content for each stage — no placeholders
+- All flows end with verify — use it to validate the change
+- ADRs can be captured at any time during a change`
 }
