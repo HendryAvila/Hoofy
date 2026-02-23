@@ -15,12 +15,17 @@ import (
 type ProposeTool struct {
 	store    config.Store
 	renderer templates.Renderer
+	bridge   StageObserver
 }
 
 // NewProposeTool creates a ProposeTool with its dependencies.
 func NewProposeTool(store config.Store, renderer templates.Renderer) *ProposeTool {
 	return &ProposeTool{store: store, renderer: renderer}
 }
+
+// SetBridge injects an optional StageObserver that gets notified
+// when the propose stage completes. Nil is safe (disables bridge).
+func (t *ProposeTool) SetBridge(obs StageObserver) { t.bridge = obs }
 
 // Definition returns the MCP tool definition for registration.
 func (t *ProposeTool) Definition() mcp.Tool {
@@ -120,7 +125,7 @@ func (t *ProposeTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		ProposedSolution: proposedSolution,
 		OutOfScope:       outOfScope,
 		SuccessCriteria:  successCriteria,
-		OpenQuestions:     openQuestions,
+		OpenQuestions:    openQuestions,
 	}
 
 	content, err := t.renderer.Render(templates.Proposal, data)
@@ -142,6 +147,8 @@ func (t *ProposeTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	if err := t.store.Save(projectRoot, cfg); err != nil {
 		return nil, fmt.Errorf("saving config: %w", err)
 	}
+
+	notifyObserver(t.bridge, cfg.Name, config.StagePropose, content)
 
 	response := fmt.Sprintf(
 		"# Proposal Created\n\n"+

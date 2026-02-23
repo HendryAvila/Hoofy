@@ -14,13 +14,18 @@ import (
 // It performs a cross-artifact consistency check across all SDD documents
 // and produces a validation report. This is the final stage of the pipeline.
 type ValidateTool struct {
-	store config.Store
+	store  config.Store
+	bridge StageObserver
 }
 
 // NewValidateTool creates a ValidateTool with its dependencies.
 func NewValidateTool(store config.Store) *ValidateTool {
 	return &ValidateTool{store: store}
 }
+
+// SetBridge injects an optional StageObserver that gets notified
+// when the validate stage completes. Nil is safe (disables bridge).
+func (t *ValidateTool) SetBridge(obs StageObserver) { t.bridge = obs }
 
 // Definition returns the MCP tool definition for registration.
 func (t *ValidateTool) Definition() mcp.Tool {
@@ -194,6 +199,8 @@ func (t *ValidateTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if err := t.store.Save(projectRoot, cfg); err != nil {
 		return nil, fmt.Errorf("saving config: %w", err)
 	}
+
+	notifyObserver(t.bridge, cfg.Name, config.StageValidate, content)
 
 	// Build response based on verdict.
 	var nextStep string

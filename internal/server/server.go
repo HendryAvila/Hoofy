@@ -95,6 +95,20 @@ func New() (*server.MCPServer, func(), error) {
 			}
 		}
 		registerMemoryTools(s, memStore)
+
+		// --- Wire SDD-Memory bridge ---
+		//
+		// When memory is available, SDD stage completions are automatically
+		// saved as memory observations with topic_key upserts. This enables
+		// cross-session awareness of pipeline state. The bridge is nil-safe:
+		// if memory init failed, tools work normally without it.
+		bridge := tools.NewMemoryBridge(memStore)
+		proposeTool.SetBridge(bridge)
+		specifyTool.SetBridge(bridge)
+		clarifyTool.SetBridge(bridge)
+		designTool.SetBridge(bridge)
+		tasksTool.SetBridge(bridge)
+		validateTool.SetBridge(bridge)
 	}
 
 	// --- Register prompts ---
@@ -284,5 +298,58 @@ SDD follows a sequential 7-stage pipeline:
 - Be specific — "users" is not a valid target audience
 - In Guided mode: use simple language, give examples, be encouraging
 - In Expert mode: be direct, technical language is fine
-- After validation, the user's SDD specs are ready for implementation with /plan mode`
+- After validation, the user's SDD specs are ready for implementation with /plan mode
+
+## PERSISTENT MEMORY
+
+SDD-Hoffy includes a persistent memory system for cross-session awareness.
+Memory survives between conversations — use it to build project knowledge over time.
+
+### When to Save (call mem_save PROACTIVELY after each of these)
+- Architectural decisions or tradeoffs made
+- Bug fixes: what was wrong, why, how it was fixed
+- New patterns or conventions established
+- Configuration changes or environment setup
+- Important discoveries, gotchas, or edge cases
+- File structure changes or significant refactoring
+
+### Content Format (use this structured format for mem_save content)
+**What**: [concise description of what was done]
+**Why**: [the reasoning, user request, or problem that drove it]
+**Where**: [files/paths affected, e.g. src/auth/middleware.ts]
+**Learned**: [gotchas, edge cases, or decisions — omit if none]
+
+### Title Guidelines
+Short and searchable: "JWT auth middleware", "Fixed N+1 in user list", "Switched from REST to gRPC"
+
+### Type Categories
+Use the type parameter: decision, architecture, bugfix, pattern, config, discovery, learning
+
+### When to Search (call mem_search)
+- At the start of a new session to recover context
+- Before making architectural decisions (check if prior decisions exist)
+- When encountering familiar errors or patterns
+- When the user references something from a previous session
+
+### Session Lifecycle
+1. Call mem_session_start at the beginning of each coding session
+2. Save observations throughout the session (decisions, fixes, discoveries)
+3. Call mem_session_summary with a structured summary (Goal/Instructions/Discoveries/Accomplished/Files)
+4. Call mem_session_end to close the session
+
+### Topic Keys for Evolving Observations
+Use topic_key when an observation should UPDATE over time (not create duplicates):
+- Architecture decisions: "architecture/auth-model", "architecture/data-layer"
+- Project configuration: "config/deployment", "config/ci-cd"
+Use mem_suggest_topic_key to generate a normalized key from a title.
+
+### User Prompts
+Call mem_save_prompt to record what the user asked — their intent and goals.
+This helps future sessions understand context without the user repeating themselves.
+
+### Progressive Disclosure Pattern
+1. Start with mem_context for recent observations
+2. Use mem_search for specific topics
+3. Use mem_timeline to see chronological context around a search result
+4. Use mem_get_observation to read the full, untruncated content`
 }

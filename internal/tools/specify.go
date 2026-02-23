@@ -15,12 +15,17 @@ import (
 type SpecifyTool struct {
 	store    config.Store
 	renderer templates.Renderer
+	bridge   StageObserver
 }
 
 // NewSpecifyTool creates a SpecifyTool with its dependencies.
 func NewSpecifyTool(store config.Store, renderer templates.Renderer) *SpecifyTool {
 	return &SpecifyTool{store: store, renderer: renderer}
 }
+
+// SetBridge injects an optional StageObserver that gets notified
+// when the specify stage completes. Nil is safe (disables bridge).
+func (t *SpecifyTool) SetBridge(obs StageObserver) { t.bridge = obs }
 
 // Definition returns the MCP tool definition for registration.
 func (t *SpecifyTool) Definition() mcp.Tool {
@@ -172,6 +177,8 @@ func (t *SpecifyTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	if err := t.store.Save(projectRoot, cfg); err != nil {
 		return nil, fmt.Errorf("saving config: %w", err)
 	}
+
+	notifyObserver(t.bridge, cfg.Name, config.StageSpecify, content)
 
 	response := fmt.Sprintf(
 		"# Requirements Generated\n\n"+

@@ -6,8 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/HendryAvila/sdd-hoffy/internal/config"
+	"github.com/HendryAvila/sdd-hoffy/internal/memory"
 	"github.com/HendryAvila/sdd-hoffy/internal/pipeline"
 	"github.com/HendryAvila/sdd-hoffy/internal/templates"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -290,10 +292,10 @@ func TestProposeTool_Handle_Success(t *testing.T) {
 	req.Params.Arguments = map[string]interface{}{
 		"problem_statement": "Freelancers waste 30+ minutes daily tracking hours across spreadsheets",
 		"target_users":      "- **Freelance designers** who need simple time tracking\n- **Small agency owners** who need team visibility",
-		"proposed_solution":  "A web app where freelancers log hours per project and see weekly reports",
-		"out_of_scope":       "- Will NOT handle invoicing\n- Will NOT support offline mode",
-		"success_criteria":   "- Users can log time in under 10 seconds\n- 80% complete onboarding without help",
-		"open_questions":     "- Should we support mobile from day one?",
+		"proposed_solution": "A web app where freelancers log hours per project and see weekly reports",
+		"out_of_scope":      "- Will NOT handle invoicing\n- Will NOT support offline mode",
+		"success_criteria":  "- Users can log time in under 10 seconds\n- 80% complete onboarding without help",
+		"open_questions":    "- Should we support mobile from day one?",
 	}
 
 	result, err := tool.Handle(context.Background(), req)
@@ -389,9 +391,9 @@ func TestProposeTool_Handle_WrongStage(t *testing.T) {
 	req.Params.Arguments = map[string]interface{}{
 		"problem_statement": "problem",
 		"target_users":      "devs",
-		"proposed_solution":  "app",
-		"out_of_scope":       "none",
-		"success_criteria":   "works",
+		"proposed_solution": "app",
+		"out_of_scope":      "none",
+		"success_criteria":  "works",
 	}
 
 	result, err := tool.Handle(context.Background(), req)
@@ -419,9 +421,9 @@ func TestProposeTool_Handle_AdvancesPipeline(t *testing.T) {
 	req.Params.Arguments = map[string]interface{}{
 		"problem_statement": "Users need a chat app",
 		"target_users":      "Remote teams",
-		"proposed_solution":  "Real-time messaging platform",
-		"out_of_scope":       "Video calls",
-		"success_criteria":   "Sub-second message delivery",
+		"proposed_solution": "Real-time messaging platform",
+		"out_of_scope":      "Video calls",
+		"success_criteria":  "Sub-second message delivery",
 	}
 
 	_, err := tool.Handle(context.Background(), req)
@@ -861,6 +863,255 @@ func TestContextTool_Handle_UnknownStage(t *testing.T) {
 	}
 	if !isErrorResult(result) {
 		t.Error("should return error for unknown stage")
+	}
+}
+
+func TestContextTool_Handle_SummaryDetailLevel(t *testing.T) {
+	_, cleanup := setupTestProject(t, config.ModeGuided)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"detail_level": "summary",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	if isErrorResult(result) {
+		t.Fatalf("expected success, got error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Summary should contain project name and mode.
+	if !strings.Contains(text, "test-project") {
+		t.Error("summary should contain project name")
+	}
+	if !strings.Contains(text, "guided") {
+		t.Error("summary should contain mode")
+	}
+
+	// Summary should contain stage names with status indicators.
+	if !strings.Contains(text, "Initialize") {
+		t.Error("summary should list Initialize stage")
+	}
+	if !strings.Contains(text, "Propose") {
+		t.Error("summary should list Propose stage")
+	}
+	if !strings.Contains(text, "✅") {
+		t.Error("summary should have completed indicator for Init")
+	}
+
+	// Summary should mark current stage.
+	if !strings.Contains(text, "←") {
+		t.Error("summary should mark current stage with arrow")
+	}
+
+	// Summary should NOT contain verbose sections from standard mode.
+	if strings.Contains(text, "Pipeline Progress") {
+		t.Error("summary should NOT contain pipeline table header")
+	}
+	if strings.Contains(text, "Artifacts") {
+		t.Error("summary should NOT contain artifacts section")
+	}
+	if strings.Contains(text, "Next Steps") {
+		t.Error("summary should NOT contain next steps section")
+	}
+	if strings.Contains(text, "Description:") {
+		t.Error("summary should NOT contain project description")
+	}
+}
+
+func TestContextTool_Handle_SummaryAtClarifyShowsScore(t *testing.T) {
+	_, cleanup := setupTestProjectAtStage(t, config.ModeGuided, config.StageClarify)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"detail_level": "summary",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	text := getResultText(result)
+	if !strings.Contains(text, "Clarity:") {
+		t.Error("summary at clarify stage should show clarity score")
+	}
+}
+
+func TestContextTool_Handle_StandardDetailLevel(t *testing.T) {
+	_, cleanup := setupTestProject(t, config.ModeGuided)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	// Explicitly requesting "standard" should behave exactly like no detail_level.
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"detail_level": "standard",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	text := getResultText(result)
+	if !strings.Contains(text, "Pipeline Progress") {
+		t.Error("standard should contain pipeline table")
+	}
+	if !strings.Contains(text, "Next Steps") {
+		t.Error("standard should contain next steps")
+	}
+}
+
+func TestContextTool_Handle_FullDetailLevel(t *testing.T) {
+	tmpDir, cleanup := setupTestProject(t, config.ModeGuided)
+	defer cleanup()
+
+	// Write a proposal artifact so there's content to include.
+	proposalPath := config.StagePath(tmpDir, config.StagePropose)
+	proposalContent := "# My Proposal\n\nThis is a full proposal.\n\n## Problem\n\nThe problem statement."
+	if err := writeStageFile(proposalPath, proposalContent); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"detail_level": "full",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	if isErrorResult(result) {
+		t.Fatalf("expected success, got error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Full should include the standard overview sections.
+	if !strings.Contains(text, "Pipeline Progress") {
+		t.Error("full should contain pipeline table from standard overview")
+	}
+	if !strings.Contains(text, "Next Steps") {
+		t.Error("full should contain next steps from standard overview")
+	}
+
+	// Full should include the inline artifact content.
+	if !strings.Contains(text, "Propose Content") {
+		t.Error("full should contain 'Propose Content' section header")
+	}
+	if !strings.Contains(text, "My Proposal") {
+		t.Error("full should include actual proposal content")
+	}
+	if !strings.Contains(text, "The problem statement") {
+		t.Error("full should include proposal body text")
+	}
+}
+
+func TestContextTool_Handle_FullDetailLevel_NoArtifacts(t *testing.T) {
+	_, cleanup := setupTestProject(t, config.ModeGuided)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"detail_level": "full",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	text := getResultText(result)
+
+	// Full with no artifacts should just be the standard overview.
+	if !strings.Contains(text, "Pipeline Progress") {
+		t.Error("full with no artifacts should contain standard overview")
+	}
+	// Should NOT have any "Content" section headers since no artifacts exist.
+	if strings.Contains(text, "Propose Content") {
+		t.Error("full with no artifacts should NOT have artifact content sections")
+	}
+}
+
+func TestContextTool_Handle_DetailLevelIgnoredWithStage(t *testing.T) {
+	tmpDir, cleanup := setupTestProject(t, config.ModeGuided)
+	defer cleanup()
+
+	// Write a proposal artifact.
+	proposalPath := config.StagePath(tmpDir, config.StagePropose)
+	if err := writeStageFile(proposalPath, "# Specific Proposal\n\nJust this one."); err != nil {
+		t.Fatalf("write proposal: %v", err)
+	}
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	// Both stage and detail_level set — stage should take priority.
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"stage":        "propose",
+		"detail_level": "summary",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	text := getResultText(result)
+
+	// Should return the stage content, NOT a summary overview.
+	if !strings.Contains(text, "Specific Proposal") {
+		t.Error("when stage is set, detail_level should be ignored — should return stage content")
+	}
+	if strings.Contains(text, "guided") {
+		t.Error("should not return overview when stage is set")
+	}
+}
+
+func TestContextTool_Handle_DefaultDetailLevel(t *testing.T) {
+	_, cleanup := setupTestProject(t, config.ModeGuided)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	tool := NewContextTool(store)
+
+	// No detail_level — should default to standard.
+	reqWithout := mcp.CallToolRequest{}
+	reqWithout.Params.Arguments = map[string]interface{}{}
+
+	resultWithout, err := tool.Handle(context.Background(), reqWithout)
+	if err != nil {
+		t.Fatalf("Handle without detail_level failed: %v", err)
+	}
+
+	textWithout := getResultText(resultWithout)
+	if !strings.Contains(textWithout, "Pipeline Progress") {
+		t.Error("no detail_level should default to standard (with Pipeline Progress)")
 	}
 }
 
@@ -1727,5 +1978,283 @@ func TestValidateTool_Handle_VerdictCaseInsensitive(t *testing.T) {
 	text := getResultText(result)
 	if !strings.Contains(text, "PASS") {
 		t.Error("result should normalize verdict to uppercase")
+	}
+}
+
+// --- Bridge tests ---
+
+// spyObserver records calls for testing.
+type spyObserver struct {
+	calls []bridgeCall
+}
+
+type bridgeCall struct {
+	projectName string
+	stage       config.Stage
+	content     string
+}
+
+func (s *spyObserver) OnStageComplete(projectName string, stage config.Stage, content string) {
+	s.calls = append(s.calls, bridgeCall{projectName, stage, content})
+}
+
+func TestNotifyObserver_NilSafe(t *testing.T) {
+	// Must not panic with nil observer.
+	notifyObserver(nil, "test", config.StagePropose, "content")
+}
+
+func TestNotifyObserver_CallsObserver(t *testing.T) {
+	spy := &spyObserver{}
+	notifyObserver(spy, "my-project", config.StageDesign, "design content")
+
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 call, got %d", len(spy.calls))
+	}
+	c := spy.calls[0]
+	if c.projectName != "my-project" {
+		t.Errorf("projectName = %q, want %q", c.projectName, "my-project")
+	}
+	if c.stage != config.StageDesign {
+		t.Errorf("stage = %q, want %q", c.stage, config.StageDesign)
+	}
+	if c.content != "design content" {
+		t.Errorf("content = %q, want %q", c.content, "design content")
+	}
+}
+
+func TestNormalizeProject(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"My Project", "my-project"},
+		{"  Hello World  ", "hello-world"},
+		{"test_project", "test_project"},
+		{"abc123", "abc123"},
+		{"special!@#chars$%^", "specialchars"},
+		{"", ""},
+	}
+	for _, tc := range tests {
+		got := normalizeProject(tc.input)
+		if got != tc.want {
+			t.Errorf("normalizeProject(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestCompactSummary_ShortContent(t *testing.T) {
+	content := "Short content"
+	result := compactSummary(config.StagePropose, content)
+	if !strings.Contains(result, "Short content") {
+		t.Errorf("short content should be preserved fully, got: %s", result)
+	}
+	if !strings.Contains(result, "propose") {
+		t.Errorf("should include stage name, got: %s", result)
+	}
+}
+
+func TestCompactSummary_LongContent(t *testing.T) {
+	content := strings.Repeat("x", 1000)
+	result := compactSummary(config.StageDesign, content)
+	if len(result) > 550 {
+		t.Errorf("compact summary too long: %d chars", len(result))
+	}
+	if !strings.Contains(result, "[...truncated]") {
+		t.Errorf("should indicate truncation, got: %s", result)
+	}
+}
+
+func TestNewMemoryBridge_NilStore(t *testing.T) {
+	bridge := NewMemoryBridge(nil)
+	if bridge != nil {
+		t.Error("NewMemoryBridge(nil) should return nil")
+	}
+}
+
+func TestMemoryBridge_OnStageComplete(t *testing.T) {
+	memCfg := memory.Config{
+		DataDir:              t.TempDir(),
+		MaxObservationLength: 2000,
+		MaxContextResults:    20,
+		MaxSearchResults:     20,
+		DedupeWindow:         15 * time.Minute,
+	}
+	ms, err := memory.New(memCfg)
+	if err != nil {
+		t.Fatalf("failed to create memory store: %v", err)
+	}
+	defer func() { _ = ms.Close() }()
+
+	bridge := NewMemoryBridge(ms)
+	bridge.OnStageComplete("Test Project", config.StagePropose, "# Proposal\n\nWe're building a thing.")
+
+	// Verify observation was saved by searching.
+	results, err := ms.Search("SDD propose", memory.SearchOptions{
+		Project: "Test Project",
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected bridge to save an observation, got 0 results")
+	}
+	if !strings.Contains(results[0].Title, "SDD propose") {
+		t.Errorf("title = %q, want it to contain 'SDD propose'", results[0].Title)
+	}
+	if !strings.Contains(results[0].Content, "Proposal") {
+		t.Errorf("content should contain artifact text, got: %s", results[0].Content)
+	}
+	wantTopicKey := "sdd/test-project/propose"
+	if results[0].TopicKey == nil || *results[0].TopicKey != wantTopicKey {
+		got := "<nil>"
+		if results[0].TopicKey != nil {
+			got = *results[0].TopicKey
+		}
+		t.Errorf("topic_key = %q, want %q", got, wantTopicKey)
+	}
+}
+
+func TestMemoryBridge_TopicKeyUpsert(t *testing.T) {
+	memCfg := memory.Config{
+		DataDir:              t.TempDir(),
+		MaxObservationLength: 2000,
+		MaxContextResults:    20,
+		MaxSearchResults:     20,
+		DedupeWindow:         0, // Disable dedup window to allow rapid upserts.
+	}
+	ms, err := memory.New(memCfg)
+	if err != nil {
+		t.Fatalf("failed to create memory store: %v", err)
+	}
+	defer func() { _ = ms.Close() }()
+
+	bridge := NewMemoryBridge(ms)
+
+	// Call twice for same stage — should upsert, not duplicate.
+	bridge.OnStageComplete("MyApp", config.StageDesign, "Design v1")
+	bridge.OnStageComplete("MyApp", config.StageDesign, "Design v2")
+
+	results, err := ms.Search("SDD design", memory.SearchOptions{
+		Project: "MyApp",
+		Limit:   10,
+	})
+	if err != nil {
+		t.Fatalf("search failed: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 observation (upsert), got %d", len(results))
+	}
+	if !strings.Contains(results[0].Content, "Design v2") {
+		t.Errorf("should have latest content, got: %s", results[0].Content)
+	}
+}
+
+func TestProposeTool_SetBridge(t *testing.T) {
+	store := config.NewFileStore()
+	renderer, _ := templates.NewRenderer()
+	tool := NewProposeTool(store, renderer)
+	spy := &spyObserver{}
+
+	// SetBridge should not panic and should be callable.
+	tool.SetBridge(spy)
+	tool.SetBridge(nil) // nil should also be safe
+}
+
+func TestProposeTool_Handle_NotifiesBridge(t *testing.T) {
+	_, cleanup := setupTestProjectAtStage(t, config.ModeGuided, config.StagePropose)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	renderer, _ := templates.NewRenderer()
+	tool := NewProposeTool(store, renderer)
+	spy := &spyObserver{}
+	tool.SetBridge(spy)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"problem_statement": "Users need help",
+		"target_users":      "- Developers",
+		"proposed_solution": "Build a tool",
+		"out_of_scope":      "- Not X",
+		"success_criteria":  "- It works",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("unexpected error: %s", getResultText(result))
+	}
+
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 bridge call, got %d", len(spy.calls))
+	}
+	if spy.calls[0].stage != config.StagePropose {
+		t.Errorf("stage = %q, want propose", spy.calls[0].stage)
+	}
+	if spy.calls[0].projectName != "test-project" {
+		t.Errorf("projectName = %q, want test-project", spy.calls[0].projectName)
+	}
+}
+
+func TestValidateTool_Handle_NotifiesBridge(t *testing.T) {
+	_, cleanup := setupValidateProject(t)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	tool := NewValidateTool(store)
+	spy := &spyObserver{}
+	tool.SetBridge(spy)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"requirements_coverage": "All covered",
+		"component_coverage":    "All covered",
+		"consistency_issues":    "_None found._",
+		"verdict":               "PASS",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("unexpected error: %s", getResultText(result))
+	}
+
+	if len(spy.calls) != 1 {
+		t.Fatalf("expected 1 bridge call, got %d", len(spy.calls))
+	}
+	if spy.calls[0].stage != config.StageValidate {
+		t.Errorf("stage = %q, want validate", spy.calls[0].stage)
+	}
+}
+
+func TestProposeTool_Handle_NilBridge_NoError(t *testing.T) {
+	_, cleanup := setupTestProjectAtStage(t, config.ModeGuided, config.StagePropose)
+	defer cleanup()
+
+	store := config.NewFileStore()
+	renderer, _ := templates.NewRenderer()
+	tool := NewProposeTool(store, renderer)
+	// Do NOT set bridge — it should be nil and still work.
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"problem_statement": "Users need help",
+		"target_users":      "- Developers",
+		"proposed_solution": "Build a tool",
+		"out_of_scope":      "- Not X",
+		"success_criteria":  "- It works",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed with nil bridge: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("unexpected error with nil bridge: %s", getResultText(result))
 	}
 }

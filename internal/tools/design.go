@@ -15,12 +15,17 @@ import (
 type DesignTool struct {
 	store    config.Store
 	renderer templates.Renderer
+	bridge   StageObserver
 }
 
 // NewDesignTool creates a DesignTool with its dependencies.
 func NewDesignTool(store config.Store, renderer templates.Renderer) *DesignTool {
 	return &DesignTool{store: store, renderer: renderer}
 }
+
+// SetBridge injects an optional StageObserver that gets notified
+// when the design stage completes. Nil is safe (disables bridge).
+func (t *DesignTool) SetBridge(obs StageObserver) { t.bridge = obs }
 
 // Definition returns the MCP tool definition for registration.
 func (t *DesignTool) Definition() mcp.Tool {
@@ -193,6 +198,8 @@ func (t *DesignTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	if err := t.store.Save(projectRoot, cfg); err != nil {
 		return nil, fmt.Errorf("saving config: %w", err)
 	}
+
+	notifyObserver(t.bridge, cfg.Name, config.StageDesign, content)
 
 	response := fmt.Sprintf(
 		"# Technical Design Created\n\n"+

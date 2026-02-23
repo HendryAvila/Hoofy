@@ -14,7 +14,7 @@ func TestSQLiteSmokeTest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Enable WAL mode
 	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
@@ -37,7 +37,7 @@ func TestFTS5SmokeTest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Create a regular table
 	_, err = db.Exec(`CREATE TABLE docs (
@@ -110,7 +110,7 @@ func TestFTS5SmokeTest(t *testing.T) {
 			if err != nil {
 				t.Fatalf("FTS5 search failed for %q: %v", tt.query, err)
 			}
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 
 			var count int
 			for rows.Next() {
@@ -138,7 +138,7 @@ func TestFTS5SpecialCharsSanitization(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	_, err = db.Exec(`CREATE TABLE docs (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT NOT NULL)`)
 	if err != nil {
@@ -179,7 +179,7 @@ func TestFTS5SpecialCharsSanitization(t *testing.T) {
 				t.Logf("query %q failed (expected for some): %v", q, err)
 				return // Some might fail — that's fine, we just don't want panics
 			}
-			defer rows.Close()
+			defer func() { _ = rows.Close() }()
 			for rows.Next() {
 				var content string
 				_ = rows.Scan(&content)
@@ -194,7 +194,7 @@ func TestSQLiteBusyTimeout(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Set busy timeout to 5 seconds (5000ms)
 	if _, err := db.Exec("PRAGMA busy_timeout=5000"); err != nil {

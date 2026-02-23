@@ -434,12 +434,12 @@ func (s *Store) migrate() error {
 	}
 
 	// Normalize existing data
-	s.execHook(s.db, `UPDATE observations SET scope = 'project' WHERE scope IS NULL OR scope = ''`)
-	s.execHook(s.db, `UPDATE observations SET topic_key = NULL WHERE topic_key = ''`)
-	s.execHook(s.db, `UPDATE observations SET revision_count = 1 WHERE revision_count IS NULL OR revision_count < 1`)
-	s.execHook(s.db, `UPDATE observations SET duplicate_count = 1 WHERE duplicate_count IS NULL OR duplicate_count < 1`)
-	s.execHook(s.db, `UPDATE observations SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''`)
-	s.execHook(s.db, `UPDATE user_prompts SET project = '' WHERE project IS NULL`)
+	_, _ = s.execHook(s.db, `UPDATE observations SET scope = 'project' WHERE scope IS NULL OR scope = ''`)                      // best-effort migration cleanup
+	_, _ = s.execHook(s.db, `UPDATE observations SET topic_key = NULL WHERE topic_key = ''`)                                    // best-effort migration cleanup
+	_, _ = s.execHook(s.db, `UPDATE observations SET revision_count = 1 WHERE revision_count IS NULL OR revision_count < 1`)    // best-effort migration cleanup
+	_, _ = s.execHook(s.db, `UPDATE observations SET duplicate_count = 1 WHERE duplicate_count IS NULL OR duplicate_count < 1`) // best-effort migration cleanup
+	_, _ = s.execHook(s.db, `UPDATE observations SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''`)      // best-effort migration cleanup
+	_, _ = s.execHook(s.db, `UPDATE user_prompts SET project = '' WHERE project IS NULL`)                                       // best-effort migration cleanup
 
 	// Create FTS triggers (idempotent)
 	var name string
@@ -563,7 +563,7 @@ func (s *Store) RecentSessions(project string, limit int) ([]SessionSummary, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []SessionSummary
 	for rows.Next() {
@@ -844,7 +844,7 @@ func (s *Store) RecentPrompts(project string, limit int) ([]Prompt, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []Prompt
 	for rows.Next() {
@@ -885,7 +885,7 @@ func (s *Store) SearchPrompts(query string, project string, limit int) ([]Prompt
 	if err != nil {
 		return nil, fmt.Errorf("search prompts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []Prompt
 	for rows.Next() {
@@ -931,7 +931,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 	if err != nil {
 		return nil, fmt.Errorf("timeline: before query: %w", err)
 	}
-	defer beforeRows.Close()
+	defer func() { _ = beforeRows.Close() }()
 
 	var beforeEntries []TimelineEntry
 	for beforeRows.Next() {
@@ -965,7 +965,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 	if err != nil {
 		return nil, fmt.Errorf("timeline: after query: %w", err)
 	}
-	defer afterRows.Close()
+	defer func() { _ = afterRows.Close() }()
 
 	var afterEntries []TimelineEntry
 	for afterRows.Next() {
@@ -985,7 +985,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 
 	// Count total observations in session
 	var totalInRange int
-	s.db.QueryRow(
+	_ = s.db.QueryRow(
 		"SELECT COUNT(*) FROM observations WHERE session_id = ? AND deleted_at IS NULL", focus.SessionID,
 	).Scan(&totalInRange)
 
@@ -1001,6 +1001,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 // ─── Search (FTS5) ───────────────────────────────────────────────────────────
 
 // Search performs full-text search across observations with filters.
+// If the query is empty or whitespace-only, falls back to returning recent observations.
 func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error) {
 	limit := opts.Limit
 	if limit <= 0 {
@@ -1011,6 +1012,11 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 	}
 
 	ftsQuery := sanitizeFTS(query)
+
+	// Empty or whitespace-only query: fall back to recent observations (no FTS).
+	if ftsQuery == "" {
+		return s.searchRecent(opts, limit)
+	}
 
 	sqlStr := `
 		SELECT o.id, o.session_id, o.type, o.title, o.content, o.tool_name, o.project,
@@ -1042,7 +1048,57 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 	if err != nil {
 		return nil, fmt.Errorf("search: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+
+	var results []SearchResult
+	for rows.Next() {
+		var sr SearchResult
+		if err := rows.Scan(
+			&sr.ID, &sr.SessionID, &sr.Type, &sr.Title, &sr.Content,
+			&sr.ToolName, &sr.Project, &sr.Scope, &sr.TopicKey, &sr.RevisionCount, &sr.DuplicateCount,
+			&sr.LastSeenAt, &sr.CreatedAt, &sr.UpdatedAt, &sr.DeletedAt,
+			&sr.Rank,
+		); err != nil {
+			return nil, err
+		}
+		results = append(results, sr)
+	}
+	return results, rows.Err()
+}
+
+// searchRecent returns the most recent observations without FTS, used as
+// fallback when the query is empty or whitespace-only.
+func (s *Store) searchRecent(opts SearchOptions, limit int) ([]SearchResult, error) {
+	sqlStr := `
+		SELECT id, session_id, type, title, content, tool_name, project,
+		       scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at,
+		       0 AS rank
+		FROM observations
+		WHERE deleted_at IS NULL
+	`
+	var args []any
+
+	if opts.Type != "" {
+		sqlStr += " AND type = ?"
+		args = append(args, opts.Type)
+	}
+	if opts.Project != "" {
+		sqlStr += " AND project = ?"
+		args = append(args, opts.Project)
+	}
+	if opts.Scope != "" {
+		sqlStr += " AND scope = ?"
+		args = append(args, normalizeScope(opts.Scope))
+	}
+
+	sqlStr += " ORDER BY created_at DESC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.queryItHook(s.db, sqlStr, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search recent: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
 
 	var results []SearchResult
 	for rows.Next() {
@@ -1066,15 +1122,15 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 func (s *Store) Stats() (*Stats, error) {
 	stats := &Stats{}
 
-	s.db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&stats.TotalSessions)
-	s.db.QueryRow("SELECT COUNT(*) FROM observations WHERE deleted_at IS NULL").Scan(&stats.TotalObservations)
-	s.db.QueryRow("SELECT COUNT(*) FROM user_prompts").Scan(&stats.TotalPrompts)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM sessions").Scan(&stats.TotalSessions)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM observations WHERE deleted_at IS NULL").Scan(&stats.TotalObservations)
+	_ = s.db.QueryRow("SELECT COUNT(*) FROM user_prompts").Scan(&stats.TotalPrompts)
 
 	rows, err := s.queryItHook(s.db, "SELECT project FROM observations WHERE project IS NOT NULL AND deleted_at IS NULL GROUP BY project ORDER BY MAX(created_at) DESC")
 	if err != nil {
 		return stats, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var p string
@@ -1161,7 +1217,7 @@ func (s *Store) Export() (*ExportData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("export sessions: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var sess Session
 		if err := rows.Scan(&sess.ID, &sess.Project, &sess.Directory, &sess.StartedAt, &sess.EndedAt, &sess.Summary); err != nil {
@@ -1182,7 +1238,7 @@ func (s *Store) Export() (*ExportData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("export observations: %w", err)
 	}
-	defer obsRows.Close()
+	defer func() { _ = obsRows.Close() }()
 	for obsRows.Next() {
 		var o Observation
 		if err := obsRows.Scan(
@@ -1205,7 +1261,7 @@ func (s *Store) Export() (*ExportData, error) {
 	if err != nil {
 		return nil, fmt.Errorf("export prompts: %w", err)
 	}
-	defer promptRows.Close()
+	defer func() { _ = promptRows.Close() }()
 	for promptRows.Next() {
 		var p Prompt
 		if err := promptRows.Scan(&p.ID, &p.SessionID, &p.Content, &p.Project, &p.CreatedAt); err != nil {
@@ -1226,7 +1282,7 @@ func (s *Store) Import(data *ExportData) (*ImportResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("import: begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	result := &ImportResult{}
 
@@ -1408,7 +1464,7 @@ func (s *Store) queryObservations(query string, args ...any) ([]Observation, err
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []Observation
 	for rows.Next() {

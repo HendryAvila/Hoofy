@@ -37,12 +37,12 @@ func (t *StatsTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 
 	var sb strings.Builder
 	sb.WriteString("## Memory Statistics\n\n")
-	sb.WriteString(fmt.Sprintf("- **Sessions**: %d\n", stats.TotalSessions))
-	sb.WriteString(fmt.Sprintf("- **Observations**: %d\n", stats.TotalObservations))
-	sb.WriteString(fmt.Sprintf("- **User Prompts**: %d\n", stats.TotalPrompts))
+	fmt.Fprintf(&sb, "- **Sessions**: %d\n", stats.TotalSessions)
+	fmt.Fprintf(&sb, "- **Observations**: %d\n", stats.TotalObservations)
+	fmt.Fprintf(&sb, "- **User Prompts**: %d\n", stats.TotalPrompts)
 
 	if len(stats.Projects) > 0 {
-		sb.WriteString(fmt.Sprintf("- **Projects** (%d): %s\n", len(stats.Projects), strings.Join(stats.Projects, ", ")))
+		fmt.Fprintf(&sb, "- **Projects** (%d): %s\n", len(stats.Projects), strings.Join(stats.Projects, ", "))
 	} else {
 		sb.WriteString("- **Projects**: none\n")
 	}

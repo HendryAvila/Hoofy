@@ -15,12 +15,17 @@ import (
 type TasksTool struct {
 	store    config.Store
 	renderer templates.Renderer
+	bridge   StageObserver
 }
 
 // NewTasksTool creates a TasksTool with its dependencies.
 func NewTasksTool(store config.Store, renderer templates.Renderer) *TasksTool {
 	return &TasksTool{store: store, renderer: renderer}
 }
+
+// SetBridge injects an optional StageObserver that gets notified
+// when the tasks stage completes. Nil is safe (disables bridge).
+func (t *TasksTool) SetBridge(obs StageObserver) { t.bridge = obs }
 
 // Definition returns the MCP tool definition for registration.
 func (t *TasksTool) Definition() mcp.Tool {
@@ -161,6 +166,8 @@ func (t *TasksTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	if err := t.store.Save(projectRoot, cfg); err != nil {
 		return nil, fmt.Errorf("saving config: %w", err)
 	}
+
+	notifyObserver(t.bridge, cfg.Name, config.StageTasks, content)
 
 	response := fmt.Sprintf(
 		"# Implementation Tasks Created\n\n"+

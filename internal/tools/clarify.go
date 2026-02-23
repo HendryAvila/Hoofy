@@ -17,12 +17,17 @@ import (
 type ClarifyTool struct {
 	store    config.Store
 	renderer templates.Renderer
+	bridge   StageObserver
 }
 
 // NewClarifyTool creates a ClarifyTool with its dependencies.
 func NewClarifyTool(store config.Store, renderer templates.Renderer) *ClarifyTool {
 	return &ClarifyTool{store: store, renderer: renderer}
 }
+
+// SetBridge injects an optional StageObserver that gets notified
+// when the clarity gate is passed. Nil is safe (disables bridge).
+func (t *ClarifyTool) SetBridge(obs StageObserver) { t.bridge = obs }
 
 // Definition returns the MCP tool definition for registration.
 func (t *ClarifyTool) Definition() mcp.Tool {
@@ -215,6 +220,8 @@ func (t *ClarifyTool) processAnswers(
 		if err := pipeline.Advance(cfg); err != nil {
 			return nil, fmt.Errorf("advancing pipeline: %w", err)
 		}
+
+		notifyObserver(t.bridge, cfg.Name, config.StageClarify, fullDoc)
 
 		response = fmt.Sprintf(
 			"# Clarity Gate PASSED\n\n"+

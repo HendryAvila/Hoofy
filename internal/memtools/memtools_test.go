@@ -25,7 +25,7 @@ func newTestStore(t *testing.T) *memory.Store {
 	if err != nil {
 		t.Fatalf("failed to create test store: %v", err)
 	}
-	t.Cleanup(func() { store.Close() })
+	t.Cleanup(func() { _ = store.Close() })
 	return store
 }
 
@@ -277,22 +277,26 @@ func TestSearchTool_WithFilters(t *testing.T) {
 	store := newTestStore(t)
 	seedSession(t, store, "test-session", "proj-a")
 
-	store.AddObservation(memory.AddObservationParams{
+	if _, err := store.AddObservation(memory.AddObservationParams{
 		SessionID: "test-session",
 		Type:      "bugfix",
 		Title:     "Fixed crash",
 		Content:   "Fixed null pointer crash in handler",
 		Project:   "proj-a",
 		Scope:     "project",
-	})
-	store.AddObservation(memory.AddObservationParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := store.AddObservation(memory.AddObservationParams{
 		SessionID: "test-session",
 		Type:      "decision",
 		Title:     "Chose PostgreSQL",
 		Content:   "Decided to use PostgreSQL for crash data",
 		Project:   "proj-b",
 		Scope:     "project",
-	})
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
 
 	tool := NewSearchTool(store)
 

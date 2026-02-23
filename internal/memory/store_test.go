@@ -23,7 +23,7 @@ func newTestStore(t *testing.T) *memory.Store {
 	if err != nil {
 		t.Fatalf("failed to create store: %v", err)
 	}
-	t.Cleanup(func() { s.Close() })
+	t.Cleanup(func() { _ = s.Close() })
 	return s
 }
 
@@ -50,7 +50,7 @@ func TestNew_CreatesDBFile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	dbPath := filepath.Join(dir, "memory.db")
 	if _, err := filepath.Abs(dbPath); err != nil {
@@ -76,14 +76,14 @@ func TestNew_IdempotentReopen(t *testing.T) {
 	if err := s1.CreateSession("sess-1", "proj", "/tmp"); err != nil {
 		t.Fatalf("create session: %v", err)
 	}
-	s1.Close()
+	_ = s1.Close()
 
 	// Reopen — data should persist
 	s2, err := memory.New(cfg)
 	if err != nil {
 		t.Fatalf("second open: %v", err)
 	}
-	defer s2.Close()
+	defer func() { _ = s2.Close() }()
 
 	sess, err := s2.GetSession("sess-1")
 	if err != nil {
@@ -405,7 +405,7 @@ func TestAddObservation_Truncation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	if err := s.CreateSession("sess", "proj", "/tmp"); err != nil {
 		t.Fatal(err)
@@ -756,9 +756,15 @@ func TestRecentPrompts_FilterByProject(t *testing.T) {
 	ensureSession(t, s, "sess1", "alpha")
 	ensureSession(t, s, "sess2", "beta")
 
-	s.AddPrompt(memory.AddPromptParams{SessionID: "sess1", Content: "Alpha question 1", Project: "alpha"})
-	s.AddPrompt(memory.AddPromptParams{SessionID: "sess2", Content: "Beta question 1", Project: "beta"})
-	s.AddPrompt(memory.AddPromptParams{SessionID: "sess1", Content: "Alpha question 2", Project: "alpha"})
+	if _, err := s.AddPrompt(memory.AddPromptParams{SessionID: "sess1", Content: "Alpha question 1", Project: "alpha"}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
+	if _, err := s.AddPrompt(memory.AddPromptParams{SessionID: "sess2", Content: "Beta question 1", Project: "beta"}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
+	if _, err := s.AddPrompt(memory.AddPromptParams{SessionID: "sess1", Content: "Alpha question 2", Project: "alpha"}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
 
 	results, err := s.RecentPrompts("alpha", 10)
 	if err != nil {
@@ -773,9 +779,15 @@ func TestSearchPrompts(t *testing.T) {
 	s := newTestStore(t)
 	ensureSession(t, s, "sess", "proj")
 
-	s.AddPrompt(memory.AddPromptParams{SessionID: "sess", Content: "How to implement JWT authentication", Project: "proj"})
-	s.AddPrompt(memory.AddPromptParams{SessionID: "sess", Content: "Fix the database migration error", Project: "proj"})
-	s.AddPrompt(memory.AddPromptParams{SessionID: "sess", Content: "Add unit tests for user service", Project: "proj"})
+	if _, err := s.AddPrompt(memory.AddPromptParams{SessionID: "sess", Content: "How to implement JWT authentication", Project: "proj"}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
+	if _, err := s.AddPrompt(memory.AddPromptParams{SessionID: "sess", Content: "Fix the database migration error", Project: "proj"}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
+	if _, err := s.AddPrompt(memory.AddPromptParams{SessionID: "sess", Content: "Add unit tests for user service", Project: "proj"}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
 
 	results, err := s.SearchPrompts("JWT authentication", "", 10)
 	if err != nil {
@@ -792,18 +804,24 @@ func TestSearch_Basic(t *testing.T) {
 	s := newTestStore(t)
 	ensureSession(t, s, "sess", "proj")
 
-	s.AddObservation(memory.AddObservationParams{
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "decision", Title: "JWT middleware",
 		Content: "Implemented JWT authentication with refresh tokens", Project: "proj",
-	})
-	s.AddObservation(memory.AddObservationParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "bugfix", Title: "Memory leak fix",
 		Content: "Fixed goroutine leak in WebSocket handler", Project: "proj",
-	})
-	s.AddObservation(memory.AddObservationParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "pattern", Title: "Repository pattern",
 		Content: "Using repository pattern for data access layer", Project: "proj",
-	})
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
 
 	results, err := s.Search("JWT authentication", memory.SearchOptions{})
 	if err != nil {
@@ -822,14 +840,18 @@ func TestSearch_FilterByType(t *testing.T) {
 	s := newTestStore(t)
 	ensureSession(t, s, "sess", "proj")
 
-	s.AddObservation(memory.AddObservationParams{
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "decision", Title: "Decision about auth",
 		Content: "Auth flow decision details", Project: "proj",
-	})
-	s.AddObservation(memory.AddObservationParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "bugfix", Title: "Auth bug fix",
 		Content: "Fixed auth bug in login flow", Project: "proj",
-	})
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
 
 	results, err := s.Search("auth", memory.SearchOptions{Type: "bugfix"})
 	if err != nil {
@@ -847,14 +869,18 @@ func TestSearch_FilterByProject(t *testing.T) {
 	ensureSession(t, s, "s1", "alpha")
 	ensureSession(t, s, "s2", "beta")
 
-	s.AddObservation(memory.AddObservationParams{
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "s1", Type: "manual", Title: "Alpha auth",
 		Content: "Authentication for alpha project", Project: "alpha",
-	})
-	s.AddObservation(memory.AddObservationParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "s2", Type: "manual", Title: "Beta auth",
 		Content: "Authentication for beta project", Project: "beta",
-	})
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
 
 	results, err := s.Search("authentication", memory.SearchOptions{Project: "alpha"})
 	if err != nil {
@@ -884,18 +910,20 @@ func TestSearch_LimitCapped(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	if err := s.CreateSession("sess", "proj", "/tmp"); err != nil {
 		t.Fatal(err)
 	}
 
 	for i := 0; i < 20; i++ {
-		s.AddObservation(memory.AddObservationParams{
+		if _, err := s.AddObservation(memory.AddObservationParams{
 			SessionID: "sess", Type: "manual", Title: "Auth entry",
 			Content: "Authentication related content number " + string(rune('a'+i)),
 			Project: "proj",
-		})
+		}); err != nil {
+			t.Fatalf("AddObservation %d: %v", i, err)
+		}
 	}
 
 	results, err := s.Search("auth", memory.SearchOptions{Limit: 100})
@@ -915,7 +943,7 @@ func TestSearch_SoftDeletedExcluded(t *testing.T) {
 		SessionID: "sess", Type: "manual", Title: "Deletable search item",
 		Content: "Unique searchable deletable content xyzzy", Project: "proj",
 	})
-	s.DeleteObservation(id, false)
+	_ = s.DeleteObservation(id, false)
 
 	results, err := s.Search("xyzzy", memory.SearchOptions{})
 	if err != nil {
@@ -1025,17 +1053,23 @@ func TestStats_WithData(t *testing.T) {
 	ensureSession(t, s, "s1", "proj-a")
 	ensureSession(t, s, "s2", "proj-b")
 
-	s.AddObservation(memory.AddObservationParams{
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "s1", Type: "manual", Title: "O1",
 		Content: "Observation one content", Project: "proj-a",
-	})
-	s.AddObservation(memory.AddObservationParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "s2", Type: "manual", Title: "O2",
 		Content: "Observation two content", Project: "proj-b",
-	})
-	s.AddPrompt(memory.AddPromptParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddPrompt(memory.AddPromptParams{
 		SessionID: "s1", Content: "A question", Project: "proj-a",
-	})
+	}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
 
 	stats, err := s.Stats()
 	if err != nil {
@@ -1063,7 +1097,7 @@ func TestStats_SoftDeletedExcluded(t *testing.T) {
 		SessionID: "sess", Type: "manual", Title: "Will delete",
 		Content: "To be deleted from stats", Project: "proj",
 	})
-	s.DeleteObservation(id, false)
+	_ = s.DeleteObservation(id, false)
 
 	stats, _ := s.Stats()
 	if stats.TotalObservations != 0 {
@@ -1089,13 +1123,17 @@ func TestFormatContext_WithData(t *testing.T) {
 	s := newTestStore(t)
 	ensureSession(t, s, "sess", "proj")
 
-	s.AddObservation(memory.AddObservationParams{
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "decision", Title: "Use PostgreSQL",
 		Content: "ACID compliance needed", Project: "proj",
-	})
-	s.AddPrompt(memory.AddPromptParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s.AddPrompt(memory.AddPromptParams{
 		SessionID: "sess", Content: "How to set up DB?", Project: "proj",
-	})
+	}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
 
 	ctx, err := s.FormatContext("proj", "")
 	if err != nil {
@@ -1136,13 +1174,17 @@ func TestExportImport_RoundTrip(t *testing.T) {
 	s1 := newTestStore(t)
 	ensureSession(t, s1, "sess", "proj")
 
-	s1.AddObservation(memory.AddObservationParams{
+	if _, err := s1.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "decision", Title: "Round trip test",
 		Content: "Content survives export/import", Project: "proj", Scope: "project",
-	})
-	s1.AddPrompt(memory.AddPromptParams{
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
+	if _, err := s1.AddPrompt(memory.AddPromptParams{
 		SessionID: "sess", Content: "Prompt survives too", Project: "proj",
-	})
+	}); err != nil {
+		t.Fatalf("AddPrompt: %v", err)
+	}
 
 	exported, err := s1.Export()
 	if err != nil {
@@ -1493,10 +1535,12 @@ func TestSearch_SpecialCharactersSanitized(t *testing.T) {
 	s := newTestStore(t)
 	ensureSession(t, s, "sess", "proj")
 
-	s.AddObservation(memory.AddObservationParams{
+	if _, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "sess", Type: "manual", Title: "Normal obs",
 		Content: "Some normal searchable content", Project: "proj",
-	})
+	}); err != nil {
+		t.Fatalf("AddObservation: %v", err)
+	}
 
 	// These would crash FTS5 without sanitization
 	dangerousQueries := []string{
