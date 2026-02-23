@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "hoofy": {
-      "command": "hoofy",
-      "args": ["serve"]
-    }
-  }
-}
