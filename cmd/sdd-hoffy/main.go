@@ -50,10 +50,11 @@ func main() {
 }
 
 func run() error {
-	s, err := sddserver.New()
+	s, cleanup, err := sddserver.New()
 	if err != nil {
 		return fmt.Errorf("creating server: %w", err)
 	}
+	defer cleanup()
 
 	// Background version check — prints to stderr so it doesn't
 	// interfere with MCP's stdio transport on stdout.

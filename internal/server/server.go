@@ -7,8 +7,11 @@ package server
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/HendryAvila/sdd-hoffy/internal/config"
+	"github.com/HendryAvila/sdd-hoffy/internal/memory"
+	"github.com/HendryAvila/sdd-hoffy/internal/memtools"
 	"github.com/HendryAvila/sdd-hoffy/internal/prompts"
 	"github.com/HendryAvila/sdd-hoffy/internal/resources"
 	"github.com/HendryAvila/sdd-hoffy/internal/templates"
@@ -22,14 +25,18 @@ var Version = "dev"
 // New creates and configures the MCP server with all tools, prompts,
 // and resources registered. This is the single place where all
 // dependencies are resolved.
-func New() (*server.MCPServer, error) {
+//
+// The returned cleanup function closes the memory store's database
+// connection and must be called on shutdown (typically via defer).
+// It is always non-nil and safe to call even if memory init failed.
+func New() (*server.MCPServer, func(), error) {
 	// --- Create shared dependencies ---
 
 	store := config.NewFileStore()
 
 	renderer, err := templates.NewRenderer()
 	if err != nil {
-		return nil, fmt.Errorf("creating template renderer: %w", err)
+		return nil, noop, fmt.Errorf("creating template renderer: %w", err)
 	}
 
 	// --- Create the MCP server ---
@@ -44,7 +51,7 @@ func New() (*server.MCPServer, error) {
 		server.WithInstructions(serverInstructions()),
 	)
 
-	// --- Register tools ---
+	// --- Register SDD tools ---
 
 	initTool := tools.NewInitTool(store)
 	s.AddTool(initTool.Definition(), initTool.Handle)
@@ -70,6 +77,26 @@ func New() (*server.MCPServer, error) {
 	contextTool := tools.NewContextTool(store)
 	s.AddTool(contextTool.Definition(), contextTool.Handle)
 
+	// --- Register memory tools ---
+	//
+	// Memory is an independent subsystem: if it fails to initialize,
+	// SDD tools continue working. We log a warning and skip memory
+	// tool registration — the server is still fully functional for
+	// spec-driven development.
+
+	cleanup := noop
+	memStore, memErr := memory.New(memory.DefaultConfig())
+	if memErr != nil {
+		log.Printf("WARNING: memory subsystem disabled: %v", memErr)
+	} else {
+		cleanup = func() {
+			if err := memStore.Close(); err != nil {
+				log.Printf("WARNING: memory store close: %v", err)
+			}
+		}
+		registerMemoryTools(s, memStore)
+	}
+
 	// --- Register prompts ---
 
 	startPrompt := prompts.NewStartPrompt()
@@ -83,7 +110,61 @@ func New() (*server.MCPServer, error) {
 	resourceHandler := resources.NewHandler(store)
 	s.AddResource(resourceHandler.StatusResource(), resourceHandler.HandleStatus)
 
-	return s, nil
+	return s, cleanup, nil
+}
+
+// noop is a no-op cleanup function used as the default when memory
+// is disabled or hasn't been initialized.
+func noop() {}
+
+// registerMemoryTools registers all 14 memory MCP tools with the server.
+func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
+	// --- Session lifecycle ---
+	sessionStart := memtools.NewSessionStartTool(ms)
+	s.AddTool(sessionStart.Definition(), sessionStart.Handle)
+
+	sessionEnd := memtools.NewSessionEndTool(ms)
+	s.AddTool(sessionEnd.Definition(), sessionEnd.Handle)
+
+	sessionSummary := memtools.NewSessionSummaryTool(ms)
+	s.AddTool(sessionSummary.Definition(), sessionSummary.Handle)
+
+	// --- Save & capture ---
+	saveTool := memtools.NewSaveTool(ms)
+	s.AddTool(saveTool.Definition(), saveTool.Handle)
+
+	savePrompt := memtools.NewSavePromptTool(ms)
+	s.AddTool(savePrompt.Definition(), savePrompt.Handle)
+
+	passiveCapture := memtools.NewPassiveCaptureTool(ms)
+	s.AddTool(passiveCapture.Definition(), passiveCapture.Handle)
+
+	// --- Query & retrieval ---
+	searchTool := memtools.NewSearchTool(ms)
+	s.AddTool(searchTool.Definition(), searchTool.Handle)
+
+	memContext := memtools.NewContextTool(ms)
+	s.AddTool(memContext.Definition(), memContext.Handle)
+
+	timelineTool := memtools.NewTimelineTool(ms)
+	s.AddTool(timelineTool.Definition(), timelineTool.Handle)
+
+	getObs := memtools.NewGetObservationTool(ms)
+	s.AddTool(getObs.Definition(), getObs.Handle)
+
+	// --- Management ---
+	deleteTool := memtools.NewDeleteTool(ms)
+	s.AddTool(deleteTool.Definition(), deleteTool.Handle)
+
+	updateTool := memtools.NewUpdateTool(ms)
+	s.AddTool(updateTool.Definition(), updateTool.Handle)
+
+	suggestKey := memtools.NewSuggestTopicKeyTool()
+	s.AddTool(suggestKey.Definition(), suggestKey.Handle)
+
+	// --- Statistics ---
+	statsTool := memtools.NewStatsTool(ms)
+	s.AddTool(statsTool.Definition(), statsTool.Handle)
 }
 
 // serverInstructions returns the system instructions that tell the AI
