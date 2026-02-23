@@ -63,4 +63,4 @@ jobs:
         run: make build
 
       - name: Verify binary runs
-        run: ./bin/sdd-hoffy --help
+        run: ./bin/hoofy --help
