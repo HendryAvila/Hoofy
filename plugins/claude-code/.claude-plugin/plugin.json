@@ -1,0 +1,21 @@
+{
+  "name": "hoofy",
+  "version": "0.4.0",
+  "description": "AI development companion that prevents hallucinations through spec-driven development, persistent memory, and adaptive change management. Think before you code.",
+  "author": {
+    "name": "Hendry Avila",
+    "url": "https://github.com/HendryAvila"
+  },
+  "homepage": "https://github.com/HendryAvila/Hoofy",
+  "repository": "https://github.com/HendryAvila/Hoofy",
+  "license": "MIT",
+  "keywords": [
+    "sdd",
+    "spec-driven-development",
+    "architecture",
+    "memory",
+    "mcp",
+    "code-quality",
+    "ai-governance"
+  ]
+}
