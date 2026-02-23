@@ -59,7 +59,24 @@ make build
 ### 2. Add to your AI tool
 
 <details>
-<summary><strong>Claude Code</strong></summary>
+<summary><strong>Claude Code</strong> (recommended: use the plugin)</summary>
+
+**Option A — Plugin (recommended)**
+
+The Hoofy plugin bundles the MCP server + a Hoofy agent + skills (`/hoofy:init`, `/hoofy:change`, `/hoofy:review`) + lifecycle hooks — all in one package:
+
+```bash
+# Clone and use directly
+git clone https://github.com/HendryAvila/Hoofy.git
+claude --plugin-dir ./Hoofy/plugins/claude-code
+
+# Or copy to your plugins directory for permanent install
+cp -r Hoofy/plugins/claude-code ~/.claude/plugins/hoofy
+```
+
+See [`plugins/claude-code/README.md`](plugins/claude-code/README.md) for full details.
+
+**Option B — MCP only (manual)**
 
 ```json
 {
@@ -152,7 +169,9 @@ Auto-checks on startup, updates when you say so.
 Hoofy already includes built-in server instructions, but adding a short block to your agent's instructions file reinforces the habit — the AI will think about specs *before* it even sees the tools.
 
 <details>
-<summary><strong>Claude Code</strong> — <code>CLAUDE.md</code></summary>
+<summary><strong>Claude Code</strong> — <code>CLAUDE.md</code> (only needed for MCP-only setup)</summary>
+
+> **Using the plugin?** Skip this — the plugin's hooks and agent already enforce SDD behavior automatically.
 
 ```markdown
 ## Hoofy — Spec-Driven Development
