@@ -61,22 +61,25 @@ make build
 <details>
 <summary><strong>Claude Code</strong> (recommended: use the plugin)</summary>
 
-**Option A — Plugin (recommended)**
+**Option A — Plugin via Marketplace (recommended)**
 
-The Hoofy plugin bundles the MCP server + a Hoofy agent + skills (`/hoofy:init`, `/hoofy:change`, `/hoofy:review`) + lifecycle hooks — all in one package:
+Inside Claude Code, run:
 
-```bash
-# Clone and use directly
-git clone https://github.com/HendryAvila/Hoofy.git
-claude --plugin-dir ./Hoofy/plugins/claude-code
-
-# Or copy to your plugins directory for permanent install
-cp -r Hoofy/plugins/claude-code ~/.claude/plugins/hoofy
+```
+/plugin marketplace add HendryAvila/hoofy-plugins
+/plugin install hoofy@hoofy-plugins
 ```
 
-See [`plugins/claude-code/README.md`](plugins/claude-code/README.md) for full details.
+That's it. You get the Hoofy agent, 3 skills, lifecycle hooks, and MCP auto-configuration.
 
-**Option B — MCP only (manual)**
+**Option B — Plugin from local directory**
+
+```bash
+git clone https://github.com/HendryAvila/hoofy-plugins.git
+claude --plugin-dir ./hoofy-plugins/plugins/hoofy
+```
+
+**Option C — MCP only (manual)**
 
 ```json
 {

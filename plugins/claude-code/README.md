@@ -20,30 +20,34 @@
 
 ## Installation
 
-### Option 1: Plugin directory (recommended for development/testing)
+### Option 1: Marketplace (recommended)
 
-```bash
-# Clone the repo
-git clone https://github.com/HendryAvila/Hoofy.git
+Inside Claude Code, run:
 
-# Run Claude Code with the plugin
-claude --plugin-dir ./Hoofy/plugins/claude-code
+```
+/plugin marketplace add HendryAvila/hoofy-plugins
+/plugin install hoofy@hoofy-plugins
 ```
 
-### Option 2: Manual installation
-
-Copy the plugin directory to your Claude Code plugins location:
+### Option 2: Plugin directory (for development/testing)
 
 ```bash
-git clone https://github.com/HendryAvila/Hoofy.git
-cp -r Hoofy/plugins/claude-code ~/.claude/plugins/hoofy
+git clone https://github.com/HendryAvila/hoofy-plugins.git
+claude --plugin-dir ./hoofy-plugins/plugins/hoofy
 ```
 
-Then add it to your `~/.claude/settings.json`:
+### Option 3: MCP only (no agent, skills, or hooks)
+
+Add to your `.mcp.json`:
 
 ```json
 {
-  "enabledPlugins": ["hoofy"]
+  "mcpServers": {
+    "hoofy": {
+      "command": "hoofy",
+      "args": ["serve"]
+    }
+  }
 }
 ```
 
