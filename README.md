@@ -147,6 +147,80 @@ hoofy update
 
 Auto-checks on startup, updates when you say so.
 
+### 5. Reinforce the behavior (recommended)
+
+Hoofy already includes built-in server instructions, but adding a short block to your agent's instructions file reinforces the habit — the AI will think about specs *before* it even sees the tools.
+
+<details>
+<summary><strong>Claude Code</strong> — <code>CLAUDE.md</code></summary>
+
+```markdown
+## Hoofy — Spec-Driven Development
+
+Before coding any new feature or significant change, use Hoofy to create specs first.
+- New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
+- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
+Do NOT start coding without specs for any non-trivial change.
+```
+</details>
+
+<details>
+<summary><strong>Cursor</strong> — <code>.cursor/rules/hoofy.md</code></summary>
+
+```markdown
+## Hoofy — Spec-Driven Development
+
+Before coding any new feature or significant change, use Hoofy to create specs first.
+- New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
+- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
+Do NOT start coding without specs for any non-trivial change.
+```
+</details>
+
+<details>
+<summary><strong>OpenCode</strong> — <code>AGENTS.md</code></summary>
+
+```markdown
+## Hoofy — Spec-Driven Development
+
+Before coding any new feature or significant change, use Hoofy to create specs first.
+- New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
+- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
+Do NOT start coding without specs for any non-trivial change.
+```
+</details>
+
+<details>
+<summary><strong>VS Code Copilot</strong> — <code>.github/copilot-instructions.md</code></summary>
+
+```markdown
+## Hoofy — Spec-Driven Development
+
+Before coding any new feature or significant change, use Hoofy to create specs first.
+- New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
+- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
+Do NOT start coding without specs for any non-trivial change.
+```
+</details>
+
+<details>
+<summary><strong>Gemini CLI</strong> — <code>GEMINI.md</code></summary>
+
+```markdown
+## Hoofy — Spec-Driven Development
+
+Before coding any new feature or significant change, use Hoofy to create specs first.
+- New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
+- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
+Do NOT start coding without specs for any non-trivial change.
+```
+</details>
+
 ---
 
 ## Memory System
