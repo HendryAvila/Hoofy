@@ -8,7 +8,7 @@ package pipeline
 import (
 	"fmt"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/config"
+	"github.com/HendryAvila/Hoofy/internal/config"
 )
 
 // --- Clarity Gate thresholds (Liskov-safe: both modes use the same interface) ---

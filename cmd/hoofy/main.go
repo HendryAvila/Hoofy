@@ -1,4 +1,4 @@
-// SDD-Hoffy: Spec-Driven Development MCP Server
+// Hoofy: Spec-Driven Development MCP Server
 //
 // A universal MCP server that integrates with any AI coding tool
 // (Claude Code, OpenCode, Gemini CLI, Codex, Cursor, VS Code Copilot)
@@ -6,8 +6,8 @@
 //
 // Usage:
 //
-//	sdd-hoffy serve    # Start MCP server (stdio transport)
-//	sdd-hoffy update   # Update to the latest version
+//	hoofy serve    # Start MCP server (stdio transport)
+//	hoofy update   # Update to the latest version
 package main
 
 import (
@@ -17,8 +17,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	sddserver "github.com/HendryAvila/sdd-hoffy/internal/server"
-	"github.com/HendryAvila/sdd-hoffy/internal/updater"
+	sddserver "github.com/HendryAvila/Hoofy/internal/server"
+	"github.com/HendryAvila/Hoofy/internal/updater"
 	"github.com/mark3labs/mcp-go/server"
 )
 
@@ -40,7 +40,7 @@ func main() {
 		printUsage()
 		os.Exit(0)
 	case "--version", "-v", "version":
-		fmt.Printf("sdd-hoffy v%s\n", sddserver.Version)
+		fmt.Printf("hoofy v%s\n", sddserver.Version)
 		os.Exit(0)
 	default:
 		fmt.Fprintf(os.Stderr, "Unknown command: %s\n\n", os.Args[1])
@@ -85,7 +85,7 @@ func checkForUpdates() {
 	if result.UpdateAvailable {
 		fmt.Fprintf(os.Stderr,
 			"\n  📦 Update available: v%s → v%s\n"+
-				"     Run: sdd-hoffy update\n"+
+				"     Run: hoofy update\n"+
 				"     Release: %s\n\n",
 			result.CurrentVersion, result.LatestVersion, result.ReleaseURL,
 		)
@@ -112,28 +112,28 @@ func runUpdate() {
 	}
 
 	fmt.Fprintf(os.Stderr, "✅ Updated to v%s!\n", result.LatestVersion)
-	fmt.Fprintf(os.Stderr, "   Restart sdd-hoffy to use the new version.\n")
+	fmt.Fprintf(os.Stderr, "   Restart hoofy to use the new version.\n")
 }
 
 func printUsage() {
-	fmt.Fprintf(os.Stderr, `SDD-Hoffy v%s — Spec-Driven Development MCP Server
+	fmt.Fprintf(os.Stderr, `Hoofy v%s — Spec-Driven Development MCP Server
 
 Usage:
-  sdd-hoffy serve    Start the MCP server (stdio transport)
-  sdd-hoffy update   Update to the latest version
+  hoofy serve    Start the MCP server (stdio transport)
+  hoofy update   Update to the latest version
 
 Configuration:
   Add to your AI tool's MCP config:
 
   {
     "mcpServers": {
-      "sdd-hoffy": {
-        "command": "sdd-hoffy",
+      "hoofy": {
+        "command": "hoofy",
         "args": ["serve"]
       }
     }
   }
 
-Learn more: https://github.com/HendryAvila/sdd-hoffy
+Learn more: https://github.com/HendryAvila/Hoofy
 `, sddserver.Version)
 }

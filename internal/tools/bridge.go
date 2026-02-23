@@ -5,9 +5,9 @@ import (
 	"log"
 	"strings"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/changes"
-	"github.com/HendryAvila/sdd-hoffy/internal/config"
-	"github.com/HendryAvila/sdd-hoffy/internal/memory"
+	"github.com/HendryAvila/Hoofy/internal/changes"
+	"github.com/HendryAvila/Hoofy/internal/config"
+	"github.com/HendryAvila/Hoofy/internal/memory"
 )
 
 // StageObserver is notified when an SDD pipeline stage completes.

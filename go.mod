@@ -1,4 +1,4 @@
-module github.com/HendryAvila/sdd-hoffy
+module github.com/HendryAvila/Hoofy
 
 go 1.25.0
 

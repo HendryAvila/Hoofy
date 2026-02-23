@@ -108,7 +108,7 @@ func TestBuildAssetName(t *testing.T) {
 		wantExt = "zip"
 	}
 
-	want := "sdd-hoffy_0.3.0_" + osName + "_" + arch + "." + wantExt
+	want := "hoofy_0.3.0_" + osName + "_" + arch + "." + wantExt
 	if got != want {
 		t.Errorf("buildAssetName(\"0.3.0\") = %q, want %q", got, want)
 	}
@@ -150,7 +150,7 @@ func withTestServer(t *testing.T, ts *httptest.Server) {
 func TestCheckVersion_UpdateAvailable(t *testing.T) {
 	release := ReleaseInfo{
 		TagName: "v0.3.0",
-		HTMLURL: "https://github.com/HendryAvila/sdd-hoffy/releases/tag/v0.3.0",
+		HTMLURL: "https://github.com/HendryAvila/Hoofy/releases/tag/v0.3.0",
 	}
 	ts := newTestServer(t, release, http.StatusOK)
 	defer ts.Close()
@@ -175,7 +175,7 @@ func TestCheckVersion_UpdateAvailable(t *testing.T) {
 func TestCheckVersion_AlreadyLatest(t *testing.T) {
 	release := ReleaseInfo{
 		TagName: "v0.2.0",
-		HTMLURL: "https://github.com/HendryAvila/sdd-hoffy/releases/tag/v0.2.0",
+		HTMLURL: "https://github.com/HendryAvila/Hoofy/releases/tag/v0.2.0",
 	}
 	ts := newTestServer(t, release, http.StatusOK)
 	defer ts.Close()
@@ -220,7 +220,7 @@ func TestCheckVersion_APIErrorStatus(t *testing.T) {
 func TestCheckVersion_DevVersion(t *testing.T) {
 	release := ReleaseInfo{
 		TagName: "v0.3.0",
-		HTMLURL: "https://github.com/HendryAvila/sdd-hoffy/releases/tag/v0.3.0",
+		HTMLURL: "https://github.com/HendryAvila/Hoofy/releases/tag/v0.3.0",
 	}
 	ts := newTestServer(t, release, http.StatusOK)
 	defer ts.Close()
@@ -236,7 +236,7 @@ func TestCheckVersion_DevVersion(t *testing.T) {
 
 // --- SelfUpdate ---
 
-// createTestTarGz creates a tar.gz archive containing a fake sdd-hoffy binary.
+// createTestTarGz creates a tar.gz archive containing a fake hoofy binary.
 func createTestTarGz(t *testing.T, binaryContent []byte) []byte {
 	t.Helper()
 	var buf bytes.Buffer
@@ -244,7 +244,7 @@ func createTestTarGz(t *testing.T, binaryContent []byte) []byte {
 	tw := tar.NewWriter(gw)
 
 	header := &tar.Header{
-		Name: "sdd-hoffy",
+		Name: "hoofy",
 		Mode: 0o755,
 		Size: int64(len(binaryContent)),
 	}
@@ -286,7 +286,7 @@ func TestSelfUpdate_Success(t *testing.T) {
 		// Default: return release info.
 		release := ReleaseInfo{
 			TagName: "v" + version,
-			HTMLURL: "https://github.com/HendryAvila/sdd-hoffy/releases/tag/v" + version,
+			HTMLURL: "https://github.com/HendryAvila/Hoofy/releases/tag/v" + version,
 			Assets: []Asset{
 				{
 					Name:               assetName,
@@ -306,7 +306,7 @@ func TestSelfUpdate_Success(t *testing.T) {
 
 	// Create a fake "current binary" that SelfUpdate will replace.
 	tmpDir := t.TempDir()
-	fakePath := filepath.Join(tmpDir, "sdd-hoffy")
+	fakePath := filepath.Join(tmpDir, "hoofy")
 	if err := os.WriteFile(fakePath, []byte("old binary"), 0o755); err != nil {
 		t.Fatalf("creating fake binary: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestSelfUpdate_Success(t *testing.T) {
 func TestSelfUpdate_AlreadyLatest(t *testing.T) {
 	release := ReleaseInfo{
 		TagName: "v0.2.0",
-		HTMLURL: "https://github.com/HendryAvila/sdd-hoffy/releases/tag/v0.2.0",
+		HTMLURL: "https://github.com/HendryAvila/Hoofy/releases/tag/v0.2.0",
 	}
 	ts := newTestServer(t, release, http.StatusOK)
 	defer ts.Close()
@@ -358,10 +358,10 @@ func TestSelfUpdate_APIError(t *testing.T) {
 func TestSelfUpdate_NoMatchingAsset(t *testing.T) {
 	release := ReleaseInfo{
 		TagName: "v0.3.0",
-		HTMLURL: "https://github.com/HendryAvila/sdd-hoffy/releases/tag/v0.3.0",
+		HTMLURL: "https://github.com/HendryAvila/Hoofy/releases/tag/v0.3.0",
 		Assets: []Asset{
 			{
-				Name:               "sdd-hoffy_0.3.0_solaris_sparc.tar.gz",
+				Name:               "hoofy_0.3.0_solaris_sparc.tar.gz",
 				BrowserDownloadURL: "https://example.com/nope",
 			},
 		},
@@ -436,7 +436,7 @@ func TestExtractBinary_DispatchesByExtension(t *testing.T) {
 	archive := createTestTarGz(t, content)
 
 	// tar.gz path
-	data, err := extractBinary(bytes.NewReader(archive), "sdd-hoffy_0.3.0_linux_amd64.tar.gz")
+	data, err := extractBinary(bytes.NewReader(archive), "hoofy_0.3.0_linux_amd64.tar.gz")
 	if err != nil {
 		t.Fatalf("extractBinary (tar.gz): %v", err)
 	}
@@ -445,7 +445,7 @@ func TestExtractBinary_DispatchesByExtension(t *testing.T) {
 	}
 
 	// zip path (should fail with unsupported)
-	_, err = extractBinary(bytes.NewReader([]byte("fake")), "sdd-hoffy_0.3.0_windows_amd64.zip")
+	_, err = extractBinary(bytes.NewReader([]byte("fake")), "hoofy_0.3.0_windows_amd64.zip")
 	if err == nil {
 		t.Fatal("extractBinary (zip): expected error")
 	}

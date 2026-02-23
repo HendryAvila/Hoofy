@@ -25,7 +25,7 @@ import (
 
 const (
 	// githubRepo is the repository path for API calls.
-	githubRepo = "HendryAvila/sdd-hoffy"
+	githubRepo = "HendryAvila/Hoofy"
 
 	// releaseURL is the GitHub API endpoint for the latest release.
 	releaseURL = "https://api.github.com/repos/" + githubRepo + "/releases/latest"
@@ -78,7 +78,7 @@ func CheckVersion(currentVersion string) *UpdateResult {
 		return result
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "sdd-hoffy/"+currentVersion)
+	req.Header.Set("User-Agent", "hoofy/"+currentVersion)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -111,7 +111,7 @@ func SelfUpdate(currentVersion string) error {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "sdd-hoffy/"+currentVersion)
+	req.Header.Set("User-Agent", "hoofy/"+currentVersion)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -198,7 +198,7 @@ func SelfUpdate(currentVersion string) error {
 }
 
 // extractBinary reads a .tar.gz (or .zip for Windows) archive and returns
-// the raw bytes of the sdd-hoffy binary inside it.
+// the raw bytes of the hoofy binary inside it.
 func extractBinary(reader io.Reader, assetName string) ([]byte, error) {
 	if strings.HasSuffix(assetName, ".zip") {
 		return extractFromZip(reader)
@@ -206,7 +206,7 @@ func extractBinary(reader io.Reader, assetName string) ([]byte, error) {
 	return extractFromTarGz(reader)
 }
 
-// extractFromTarGz pulls the sdd-hoffy binary out of a .tar.gz archive.
+// extractFromTarGz pulls the hoofy binary out of a .tar.gz archive.
 func extractFromTarGz(reader io.Reader) ([]byte, error) {
 	gz, err := gzip.NewReader(reader)
 	if err != nil {
@@ -225,7 +225,7 @@ func extractFromTarGz(reader io.Reader) ([]byte, error) {
 		}
 
 		name := filepath.Base(header.Name)
-		if name == "sdd-hoffy" || name == "sdd-hoffy.exe" {
+		if name == "hoofy" || name == "hoofy.exe" {
 			data, err := io.ReadAll(tr)
 			if err != nil {
 				return nil, fmt.Errorf("reading binary from tar: %w", err)
@@ -234,7 +234,7 @@ func extractFromTarGz(reader io.Reader) ([]byte, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("sdd-hoffy binary not found in archive")
+	return nil, fmt.Errorf("hoofy binary not found in archive")
 }
 
 // extractFromZip reads the entire zip into memory (Windows .zip files are small)
@@ -242,7 +242,7 @@ func extractFromTarGz(reader io.Reader) ([]byte, error) {
 func extractFromZip(reader io.Reader) ([]byte, error) {
 	// For zip we need to read the whole thing since zip requires random access.
 	// The binary is ~10MB, so this is fine.
-	tmpFile, err := os.CreateTemp("", "sdd-hoffy-*.zip")
+	tmpFile, err := os.CreateTemp("", "hoofy-*.zip")
 	if err != nil {
 		return nil, fmt.Errorf("creating temp file: %w", err)
 	}
@@ -270,7 +270,7 @@ func buildAssetName(version string) string {
 		ext = "zip"
 	}
 
-	return fmt.Sprintf("sdd-hoffy_%s_%s_%s.%s", version, osName, arch, ext)
+	return fmt.Sprintf("hoofy_%s_%s_%s.%s", version, osName, arch, ext)
 }
 
 // normalizeVersion strips the leading "v" from version strings.

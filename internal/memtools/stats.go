@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/memory"
+	"github.com/HendryAvila/Hoofy/internal/memory"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

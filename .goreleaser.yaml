@@ -1,6 +1,6 @@
 version: 2
 
-project_name: sdd-hoffy
+project_name: hoofy
 
 before:
   hooks:
@@ -8,12 +8,12 @@ before:
     - go vet ./...
 
 builds:
-  - id: sdd-hoffy
-    main: ./cmd/sdd-hoffy/
-    binary: sdd-hoffy
+  - id: hoofy
+    main: ./cmd/hoofy/
+    binary: hoofy
     ldflags:
       - -s -w
-      - -X github.com/HendryAvila/sdd-hoffy/internal/server.Version={{.Version}}
+      - -X github.com/HendryAvila/Hoofy/internal/server.Version={{.Version}}
     env:
       - CGO_ENABLED=0
     goos:
@@ -49,7 +49,7 @@ changelog:
 release:
   github:
     owner: HendryAvila
-    name: sdd-hoffy
+    name: Hoofy
   draft: false
   prerelease: auto
   name_template: "v{{ .Version }}"

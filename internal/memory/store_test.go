@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/memory"
+	"github.com/HendryAvila/Hoofy/internal/memory"
 )
 
 // newTestStore creates a Store backed by a temp directory for isolation.

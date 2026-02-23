@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/changes"
+	"github.com/HendryAvila/Hoofy/internal/changes"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

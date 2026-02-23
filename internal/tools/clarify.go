@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/config"
-	"github.com/HendryAvila/sdd-hoffy/internal/pipeline"
-	"github.com/HendryAvila/sdd-hoffy/internal/templates"
+	"github.com/HendryAvila/Hoofy/internal/config"
+	"github.com/HendryAvila/Hoofy/internal/pipeline"
+	"github.com/HendryAvila/Hoofy/internal/templates"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/config"
+	"github.com/HendryAvila/Hoofy/internal/config"
 )
 
 func init() {

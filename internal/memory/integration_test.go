@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/HendryAvila/sdd-hoffy/internal/memory"
+	"github.com/HendryAvila/Hoofy/internal/memory"
 )
 
 // ─── Full Session Lifecycle Integration ─────────────────────────────────────

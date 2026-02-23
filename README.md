@@ -1,116 +1,36 @@
-# SDD-Hoffy
+<p align="center">
+  <img src="assets/logo.png" alt="Hoofy" width="280" />
+</p>
 
-**Spec-Driven Development for the AI era.** An MCP server that guides you from a vague idea to clear, actionable specifications — so your AI coder builds what you actually want.
+<h1 align="center">Hoofy</h1>
 
-[![CI](https://github.com/HendryAvila/sdd-hoffy/actions/workflows/ci.yml/badge.svg)](https://github.com/HendryAvila/sdd-hoffy/actions/workflows/ci.yml)
-[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![MCP](https://img.shields.io/badge/MCP-Compatible-purple)](https://modelcontextprotocol.io)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Release](https://img.shields.io/github/v/release/HendryAvila/sdd-hoffy?include_prereleases)](https://github.com/HendryAvila/sdd-hoffy/releases)
+<p align="center">
+  <strong>Your AI development companion.</strong><br>
+  An MCP server that gives your AI persistent memory, structured specifications,<br>
+  and adaptive change management — so it builds what you actually want.
+</p>
 
----
-
-## The Problem
-
-AI coding tools are powerful but they hallucinate. A lot.
-
-The METR 2025 study found that developers are [19% slower with AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) despite _feeling_ 20% faster. The DORA 2025 State of DevOps Report shows a [7.2% delivery instability increase](https://dora.dev/research/2025/dora-report/) for every 25% AI adoption — without foundational systems. McKinsey 2025 reports that top performers see [16-30% productivity gains](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/superagency-in-the-workplace-empowering-people-to-unlock-ais-full-potential-at-work) only when they communicate structured requirements.
-
-The pattern is clear: **AI without clear specifications makes things worse, not better.**
-
-The root cause? Ambiguity. When you tell an AI "build me an app", it fills in the blanks with assumptions. Those assumptions are hallucinations.
-
-## The Solution: Spec-Driven Development
-
-SDD-Hoffy solves this with **two complementary pipelines**:
-
-**Project Pipeline** — Full greenfield specification:
-```
-Vague Idea → Proposal → Requirements → Clarity Gate → Architecture → Tasks → Validation → Ready for AI
-```
-
-**Change Pipeline** — Adaptive ongoing development:
-```
-Change (type + size) → [describe/propose/scope] → [spec] → [clarify] → [design] → tasks → verify
-                        └─── stages selected automatically based on type × size ───┘
-```
-
-The **Clarity Gate** is the core innovation. It analyzes your requirements across 8 dimensions and blocks progress until ambiguities are resolved. The AI can't skip ahead to architecture until your specs are clear enough.
-
-After the gate, SDD-Hoffy continues into **technical design**, **atomic task breakdown**, and a **cross-artifact validation** that catches inconsistencies before a single line of code is written.
-
-For ongoing work, the **Change Pipeline** adapts the number of stages to the size and type of change — a small bug fix gets 3 stages, a large feature gets 6.
+<p align="center">
+  <a href="https://github.com/HendryAvila/Hoofy/actions/workflows/ci.yml"><img src="https://github.com/HendryAvila/Hoofy/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://go.dev"><img src="https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go&logoColor=white" alt="Go"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-Compatible-purple" alt="MCP"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  <a href="https://github.com/HendryAvila/Hoofy/releases"><img src="https://img.shields.io/github/v/release/HendryAvila/Hoofy?include_prereleases" alt="Release"></a>
+</p>
 
 ---
 
-## SDD-Hoffy vs Plan Mode
+## What Hoofy Does
 
-If you use Cursor, Claude Code, Codex, or similar tools, you've probably used `/plan mode` or something like it. So what's the difference?
+Hoofy is three systems in one MCP server:
 
-**They operate at different layers:**
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                   WHAT to build                         │
-│                                                         │
-│  SDD-Hoffy (Requirements Engineering Layer)             │
-│  ─────────────────────────────────────────               │
-│  "WHO are the users? WHAT must the system do?           │
-│   What's out of scope? What are the NFRs?               │
-│   What architecture addresses these requirements?       │
-│   What tasks cover the full design?"                    │
-│                                                         │
-├─────────────────────────────────────────────────────────┤
-│                   HOW to build it                       │
-│                                                         │
-│  /plan mode (Implementation Layer)                      │
-│  ─────────────────────────────────                      │
-│  "What files do I create? What functions do I write?    │
-│   What tests do I need? What's the PR structure?"       │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-```
-
-**SDD-Hoffy is the architect. Plan mode is the contractor.**
-
-An architect decides _what_ the building needs: load-bearing walls, plumbing routes, electrical capacity, fire exits. A contractor decides _how_ to build it: which tools, what order, which crew. You wouldn't hire a contractor without blueprints — and you shouldn't use plan mode without specifications.
-
-### What each one does
-
-| Concern | SDD-Hoffy | Plan Mode |
+| System | What it does | Tools |
 |---|---|---|
-| **"Who are the users?"** | Defines 2-3 personas with needs | Doesn't ask |
-| **"What's out of scope?"** | Explicit exclusion list | Doesn't track |
-| **"Is this requirement ambiguous?"** | Clarity Gate with 8-dimension scoring | No check |
-| **"What architecture fits?"** | Full design doc with ADRs and rationale | Infers from code |
-| **"Are all requirements covered?"** | Cross-artifact validation report | No traceability |
-| **"What files should I change?"** | Not its job | This is what it does |
-| **"What's the implementation order?"** | Not its job | This is what it does |
+| **Memory** | Persistent context across sessions — decisions, bugs, patterns, discoveries. Your AI remembers what happened yesterday. | 14 `mem_*` tools |
+| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). | 4 `sdd_change*` + `sdd_adr` |
+| **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate that blocks hallucinations. | 8 `sdd_*` tools |
 
-### The workflow together
-
-```
-1. Run SDD-Hoffy    →  Produce: proposal.md, requirements.md, design.md, tasks.md
-2. Open plan mode   →  Feed it the SDD artifacts as context
-3. Execute          →  AI implements with clear specs, minimal hallucination
-```
-
-SDD-Hoffy doesn't replace plan mode. It makes plan mode **dramatically better** by giving it unambiguous input.
-
----
-
-## What Makes SDD-Hoffy Different
-
-| Feature | SDD-Hoffy | Traditional CLI Tools |
-|---|---|---|
-| **Interface** | MCP server (works in ANY AI tool) | Standalone CLI |
-| **LLM config** | Zero — your AI tool handles it | API keys, env vars |
-| **Compatibility** | Claude Code, Gemini CLI, Codex, Cursor, VS Code Copilot, OpenCode | Single tool only |
-| **Install** | One-liner install + auto-update | npm/pip, dependencies |
-| **Dual mode** | Guided (beginners) + Expert (devs) | One size fits all |
-| **Full pipeline** | Idea → Specs → Architecture → Tasks → Validation | Specs only |
-| **Change pipeline** | Adaptive flows for ongoing dev (12 variants) | None |
-| **ADRs** | First-class Architecture Decision Records | None |
+One binary. Zero config. Works in **any** MCP-compatible AI tool.
 
 ---
 
@@ -118,44 +38,34 @@ SDD-Hoffy doesn't replace plan mode. It makes plan mode **dramatically better** 
 
 ### 1. Install
 
-**One-liner (recommended):**
-
 ```bash
-curl -sSL https://raw.githubusercontent.com/HendryAvila/sdd-hoffy/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/HendryAvila/Hoofy/main/install.sh | bash
 ```
 
-This detects your OS/architecture, downloads the latest binary, and installs it — no Go required.
-
 <details>
-<summary><strong>Other installation methods</strong></summary>
+<summary>Other methods</summary>
 
 ```bash
 # Go install (requires Go 1.25+)
-go install github.com/HendryAvila/sdd-hoffy/cmd/sdd-hoffy@latest
+go install github.com/HendryAvila/Hoofy/cmd/hoofy@latest
 
 # Build from source
-git clone https://github.com/HendryAvila/sdd-hoffy.git
-cd sdd-hoffy
+git clone https://github.com/HendryAvila/Hoofy.git
+cd Hoofy
 make build
-
-# Manual download (pick your platform)
-# https://github.com/HendryAvila/sdd-hoffy/releases
 ```
 </details>
 
-### 2. Configure your AI tool
-
-Add SDD-Hoffy to your tool's MCP configuration:
+### 2. Add to your AI tool
 
 <details>
 <summary><strong>Claude Code</strong></summary>
 
-Add to `.claude/settings.json` or project settings:
 ```json
 {
   "mcpServers": {
-    "sdd-hoffy": {
-      "command": "sdd-hoffy",
+    "hoofy": {
+      "command": "hoofy",
       "args": ["serve"]
     }
   }
@@ -166,13 +76,12 @@ Add to `.claude/settings.json` or project settings:
 <details>
 <summary><strong>VS Code Copilot</strong></summary>
 
-Add to `.vscode/mcp.json`:
 ```json
 {
   "servers": {
-    "sdd-hoffy": {
+    "hoofy": {
       "type": "stdio",
-      "command": "sdd-hoffy",
+      "command": "hoofy",
       "args": ["serve"]
     }
   }
@@ -183,12 +92,11 @@ Add to `.vscode/mcp.json`:
 <details>
 <summary><strong>Cursor</strong></summary>
 
-Add to your MCP configuration:
 ```json
 {
   "mcpServers": {
-    "sdd-hoffy": {
-      "command": "sdd-hoffy",
+    "hoofy": {
+      "command": "hoofy",
       "args": ["serve"]
     }
   }
@@ -199,13 +107,12 @@ Add to your MCP configuration:
 <details>
 <summary><strong>OpenCode</strong></summary>
 
-Add to `~/.config/opencode/opencode.json` (inside the `"mcp"` key):
 ```json
 {
   "mcp": {
-    "sdd-hoffy": {
+    "hoofy": {
       "type": "local",
-      "command": ["sdd-hoffy", "serve"],
+      "command": ["hoofy", "serve"],
       "enabled": true
     }
   }
@@ -216,12 +123,11 @@ Add to `~/.config/opencode/opencode.json` (inside the `"mcp"` key):
 <details>
 <summary><strong>Gemini CLI</strong></summary>
 
-Add to your MCP settings:
 ```json
 {
   "mcpServers": {
-    "sdd-hoffy": {
-      "command": "sdd-hoffy",
+    "hoofy": {
+      "command": "hoofy",
       "args": ["serve"]
     }
   }
@@ -231,229 +137,51 @@ Add to your MCP settings:
 
 ### 3. Use it
 
-Just talk to your AI tool:
+Just talk to your AI. Hoofy's built-in instructions tell the AI when and how to use each system.
 
-> "I want to start a new SDD project for a task management app"
-
-The AI will use SDD-Hoffy's tools to guide you through the full pipeline. Or use the prompt directly:
-
-> `/sdd-start`
-
-### 4. Keep it updated
-
-SDD-Hoffy checks for updates automatically when you start the server and shows a non-intrusive notice if a new version is available. To update:
+### 4. Update
 
 ```bash
-sdd-hoffy update
+hoofy update
 ```
 
-No auto-restarts, no surprises — you decide when to update.
-
-### 5. Make it proactive (optional but recommended)
-
-SDD-Hoffy already includes built-in instructions that tell your AI when to suggest using the SDD pipeline. But if you want to **reinforce** this behavior, add the following to your project's agent instructions file:
-
-<details>
-<summary><strong>Claude Code</strong> — add to <code>CLAUDE.md</code></summary>
-
-```markdown
-## Spec-Driven Development
-
-When the user asks to build a new project, add a feature, or design something,
-ALWAYS suggest using SDD-Hoffy first to create clear specs before writing code.
-Use the /sdd-start prompt or call sdd_init_project to begin the pipeline.
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>Cursor</strong> — add to <code>.cursor/rules/sdd.md</code></summary>
-
-```markdown
-## Spec-Driven Development
-
-When the user asks to build a new project, add a feature, or design something,
-ALWAYS suggest using SDD-Hoffy first to create clear specs before writing code.
-Use the /sdd-start prompt or call sdd_init_project to begin the pipeline.
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>OpenCode</strong> — add to <code>AGENTS.md</code></summary>
-
-```markdown
-## Spec-Driven Development
-
-When the user asks to build a new project, add a feature, or design something,
-ALWAYS suggest using SDD-Hoffy first to create clear specs before writing code.
-Use the /sdd-start prompt or call sdd_init_project to begin the pipeline.
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>VS Code Copilot</strong> — add to <code>.github/copilot-instructions.md</code></summary>
-
-```markdown
-## Spec-Driven Development
-
-When the user asks to build a new project, add a feature, or design something,
-ALWAYS suggest using SDD-Hoffy first to create clear specs before writing code.
-Use the /sdd-start prompt or call sdd_init_project to begin the pipeline.
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>Gemini CLI</strong> — add to <code>GEMINI.md</code></summary>
-
-```markdown
-## Spec-Driven Development
-
-When the user asks to build a new project, add a feature, or design something,
-ALWAYS suggest using SDD-Hoffy first to create clear specs before writing code.
-Use the /sdd-start prompt or call sdd_init_project to begin the pipeline.
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
+Auto-checks on startup, updates when you say so.
 
 ---
 
-## Two Pipelines, One Server
+## Memory System
 
-SDD-Hoffy has **two independent pipelines** that serve different purposes:
+Hoofy gives your AI **persistent memory** across sessions using SQLite + FTS5 full-text search. No more re-explaining context every time you start a conversation.
 
-| Pipeline | Purpose | When to use |
-|---|---|---|
-| **Project Pipeline** | Full greenfield specification (7 stages) | Starting a new project from scratch |
-| **Change Pipeline** | Adaptive workflow for ongoing development | Features, fixes, refactors, enhancements |
+### What gets remembered
 
-The **Project Pipeline** is the architect's blueprint. The **Change Pipeline** is the ongoing construction management. Both run independently and can coexist in the same project.
-
----
-
-## The Project Pipeline
-
-SDD-Hoffy's project pipeline follows a sequential 7-stage process. Each stage builds on the previous one, and you can't skip ahead until the current stage is complete.
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                  Project Pipeline                        │
-│                                                          │
-│  ┌──────┐   ┌─────────┐   ┌─────────┐   ┌────────────┐   │
-│  │ INIT │──▶│ PROPOSE │──▶│ SPECIFY │──▶│  CLARIFY     │
-│  └──────┘   └─────────┘   └─────────┘   └─────┬──────┘   │
-│                                                │         │
-│                                        ┌───────┘         │
-│                                        ▼                 │
-│                                 ┌────────────┐           │
-│                                 │Clarity Gate│           │
-│                                 │Score >= 70?│           │
-│                                 └──────┬─────┘           │
-│                               No │     │ Yes             │
-│                                  │     ▼                 │
-│                               ◀──┘  ┌────────┐           │
-│                                     │ DESIGN │           │
-│                                     └────┬───┘           │
-│                                          ▼               │
-│                                     ┌────────┐           │
-│                                     │ TASKS  │           │
-│                                     └────┬───┘           │
-│                                          ▼               │
-│                                     ┌──────────┐         │
-│                                     │ VALIDATE │         │
-│                                     └──────────┘         │
-│                                          │               │
-│                                          ▼               │
-│                                  Ready for /plan         │
-│                                  mode & coding           │
-└──────────────────────────────────────────────────────────┘
-```
-
-### Stage 0: Init
-Set up the SDD project structure. Creates a `sdd/` directory with configuration.
-
-### Stage 1: Propose
-Transform your vague idea into a structured proposal with:
-- **Problem Statement** — What pain point does this solve?
-- **Target Users** — Who specifically will use this?
-- **Proposed Solution** — What are we building? (high level, no tech details)
-- **Out of Scope** — What this project does NOT do
-- **Success Criteria** — How do we know it worked?
-- **Open Questions** — Things we're still unsure about
-
-### Stage 2: Specify
-Extract formal requirements from the proposal using [MoSCoW prioritization](https://en.wikipedia.org/wiki/MoSCoW_method):
-- **Must Have** — Non-negotiable for launch
-- **Should Have** — Important but not blocking
-- **Could Have** — Nice to have, can wait
-- **Won't Have** — Explicitly excluded from this version
-
-Each requirement gets a unique ID (FR-001, NFR-001) for traceability.
-
-### Stage 3: Clarify (The Clarity Gate)
-The core innovation. SDD-Hoffy analyzes your requirements across **8 dimensions**:
-
-| Dimension | What it checks |
-|---|---|
-| Target Users | Are user personas clearly defined? |
-| Core Functionality | Are main features unambiguous? |
-| Data Model | Are entities and relationships clear? |
-| Integrations | Are external system interfaces defined? |
-| Edge Cases | Are error scenarios addressed? |
-| Security | Are auth and data protection requirements clear? |
-| Scale & Performance | Are performance expectations defined? |
-| Scope Boundaries | Is it clear what the system does NOT do? |
-
-The pipeline **blocks** until the clarity score meets the threshold:
-- **Guided mode:** 70/100 (more thoroughness for non-technical users)
-- **Expert mode:** 50/100 (developers can handle more ambiguity)
-
-### Stage 4: Design
-Create a technical architecture document grounded in your validated requirements:
-- **Architecture Overview** — Pattern choice (monolith, microservices, serverless) with rationale
-- **Tech Stack** — Every technology choice justified against requirements
-- **Components** — Modules with responsibilities, boundaries, and requirement traceability (FR-XXX)
-- **API Contracts** — Endpoint definitions, schemas, error codes
-- **Data Model** — Schema, relationships, constraints, indexes
-- **Infrastructure** — Deployment strategy, CI/CD, environments
-- **Security** — Auth strategy, encryption, rate limiting (addressing NFRs)
-- **Design Decisions** — ADRs with alternatives considered and why they were rejected
-
-### Stage 5: Tasks
-Break the design into atomic, AI-ready implementation tasks:
-- **Each task** has a unique ID (TASK-001), maps to requirements (FR-XXX), identifies affected components, lists dependencies, and includes acceptance criteria
-- **Dependency graph** shows what can be parallelized and what's sequential
-- **Effort estimate** for the full implementation
-- **Global acceptance criteria** — project-wide quality gates (coverage, linting, testing)
-
-### Stage 6: Validate
-Cross-artifact consistency check — the final quality gate:
-- **Requirements coverage** — Is every FR-XXX/NFR-XXX covered by at least one task?
-- **Component coverage** — Does every component in the design have tasks assigned?
-- **Consistency check** — Do tasks match the design? Does the design match the requirements?
-- **Risk assessment** — What could go wrong during implementation?
-- **Verdict** — PASS, PASS_WITH_WARNINGS, or FAIL (with actionable recommendations)
-
-If validation fails, SDD-Hoffy tells you exactly which stage to revisit and what to fix.
-
----
-
-## The Change Pipeline
-
-Once your project is running, you need a lighter process for ongoing work. The change pipeline adapts its stages based on **what you're doing** and **how big the change is**.
+- **Decisions** — Why you chose PostgreSQL over MongoDB
+- **Bug fixes** — What was wrong, why, how you fixed it
+- **Patterns** — Conventions established in the codebase
+- **Discoveries** — Gotchas, edge cases, non-obvious learnings
+- **Session summaries** — What happened in each coding session
 
 ### How it works
 
-1. **Create a change** — Tell SDD-Hoffy what kind of work it is (feature, fix, refactor, enhancement) and how big it is (small, medium, large)
-2. **Follow the flow** — The pipeline selects the right stages automatically
-3. **Advance through stages** — Save content at each stage, advance to the next
-4. **Verify and archive** — Final verification, then archive for history
+Memory is structured around **observations** with types (`decision`, `architecture`, `bugfix`, `pattern`, `discovery`, `config`), **topic keys** for upserts (evolving knowledge overwrites, not duplicates), and **sessions** for temporal context.
 
-### Adaptive stage flows
+```
+mem_save → Store an observation with structured content
+mem_search → Full-text search across all sessions
+mem_context → Recent context for session startup
+mem_timeline → Chronological drill-down around a specific event
+mem_session_start/end/summary → Session lifecycle management
+```
 
-The pipeline automatically selects the right number of stages. Small changes get 3 stages, large ones get up to 6:
+The AI uses these proactively — saving important findings after completing work, searching past context when starting new tasks, and building session summaries when wrapping up.
+
+---
+
+## Change Pipeline
+
+For ongoing development, Hoofy adapts the number of stages to what you're actually doing. A small bug fix doesn't need the same ceremony as a large feature.
+
+### Adaptive flows
 
 ```
                     Small           Medium              Large
@@ -471,35 +199,27 @@ Enhancement     describe→tasks    propose→spec        propose→spec→clari
                   →verify          →tasks→verify        →design→tasks→verify
 ```
 
-That's **12 different flow variants** — all deterministic, no guessing.
+**12 flow variants**, all deterministic. One active change at a time to prevent scope creep.
 
 ### ADRs (Architecture Decision Records)
 
-ADRs are a first-class concept. Record architectural decisions at any point during a change:
+First-class concept. Record decisions at any point with full lifecycle management (`proposed` → `accepted` → `deprecated` / `rejected`):
 
 ```
 sdd_adr(title: "PostgreSQL over MongoDB", status: "accepted",
         context: "Need ACID for financial data",
         decision: "Use PostgreSQL 16",
-        consequences: "Need migration tooling, team training")
+        consequences: "Need migration tooling")
 ```
 
-ADRs support lifecycle management: `proposed` → `accepted` → `deprecated` (or `rejected`).
-
-### One active change at a time
-
-SDD-Hoffy enforces focus. You can only have one active change at a time. Complete or archive the current one before starting the next. This prevents scope creep and context switching.
-
 ### Change artifacts
-
-Each change gets its own directory under `sdd/changes/`:
 
 ```
 sdd/changes/
 └── fix-login-timeout/
-    ├── manifest.json       # Change metadata (type, size, status, stages)
+    ├── manifest.json       # Metadata (type, size, status, stages)
     ├── describe.md         # What's the problem/feature?
-    ├── spec.md             # Formal requirements (medium+ changes)
+    ├── spec.md             # Requirements (medium+ changes)
     ├── design.md           # Technical approach (large changes)
     ├── tasks.md            # Implementation breakdown
     └── verify.md           # Verification checklist
@@ -507,181 +227,139 @@ sdd/changes/
 
 ---
 
-## Dual Mode
+## Project Pipeline
 
-SDD-Hoffy adapts to your experience level:
+For greenfield projects, Hoofy runs a full 7-stage specification process:
 
-### Guided Mode (for vibe coders and non-technical users)
-- Step-by-step instructions with examples
-- More clarifying questions
-- Simpler language, no jargon
-- Higher clarity threshold (70/100)
-- Templates include example content
-
-### Expert Mode (for experienced developers)
-- Streamlined flow, fewer questions
-- Accepts technical input directly
-- Lower clarity threshold (50/100)
-- Lean templates, just section headers
-
-Set the mode when initializing:
 ```
-sdd_init_project(name: "my-app", description: "...", mode: "guided")
+Vague Idea → Proposal → Requirements → Clarity Gate → Architecture → Tasks → Validation
 ```
+
+The **Clarity Gate** is the core innovation. It analyzes requirements across 8 dimensions (target users, core functionality, data model, integrations, edge cases, security, scale, scope boundaries) and **blocks progress** until ambiguities are resolved. The AI can't skip ahead to architecture until specs are clear enough.
+
+- **Guided mode** (70/100 threshold) — Step-by-step with examples, for non-technical users
+- **Expert mode** (50/100 threshold) — Streamlined for experienced developers
+
+After the gate: technical design with ADRs → atomic task breakdown with dependency graphs → cross-artifact validation that catches inconsistencies before any code is written.
 
 ---
 
 ## Available Tools
 
-### Project Pipeline
-
-| Tool | Stage | Description |
-|---|---|---|
-| `sdd_init_project` | 0 | Initialize SDD project structure |
-| `sdd_create_proposal` | 1 | Save a structured proposal from your idea |
-| `sdd_generate_requirements` | 2 | Save formal requirements from the proposal |
-| `sdd_clarify` | 3 | Run the Clarity Gate analysis |
-| `sdd_create_design` | 4 | Save the technical architecture document |
-| `sdd_create_tasks` | 5 | Save the atomic implementation task breakdown |
-| `sdd_validate` | 6 | Run cross-artifact consistency check |
-| `sdd_get_context` | Any | View current project state and artifacts |
-
-### Change Pipeline
+### Memory (14 tools)
 
 | Tool | Description |
 |---|---|
-| `sdd_change` | Create a new change (feature, fix, refactor, enhancement) with size selection |
-| `sdd_change_advance` | Save stage content and advance to the next stage |
-| `sdd_change_status` | View current change status, stages, and artifacts |
+| `mem_save` | Save an observation (decision, bugfix, pattern, etc.) |
+| `mem_save_prompt` | Record user intent for future context |
+| `mem_search` | Full-text search across all sessions |
+| `mem_context` | Recent observations for session startup |
+| `mem_timeline` | Chronological context around a specific event |
+| `mem_get_observation` | Full content of a specific observation |
+| `mem_session_start` | Register a new coding session |
+| `mem_session_end` | Close a session with summary |
+| `mem_session_summary` | Save comprehensive end-of-session summary |
+| `mem_stats` | Memory system statistics |
+| `mem_capture_passive` | Passive observation capture |
+| `mem_delete` | Remove an observation |
+| `mem_update` | Update an existing observation |
+| `mem_suggest_topic_key` | Suggest stable key for upserts |
+
+### Change Pipeline (5 tools)
+
+| Tool | Description |
+|---|---|
+| `sdd_change` | Create a new change (feature, fix, refactor, enhancement) with size |
+| `sdd_change_advance` | Save stage content and advance to next stage |
+| `sdd_change_status` | View current change status and artifacts |
 | `sdd_adr` | Create or update Architecture Decision Records |
 
-## Available Prompts
+### Project Pipeline (8 tools)
+
+| Tool | Description |
+|---|---|
+| `sdd_init_project` | Initialize project structure |
+| `sdd_create_proposal` | Save structured proposal |
+| `sdd_generate_requirements` | Save formal requirements (MoSCoW) |
+| `sdd_clarify` | Run the Clarity Gate |
+| `sdd_create_design` | Save technical architecture |
+| `sdd_create_tasks` | Save implementation task breakdown |
+| `sdd_validate` | Cross-artifact consistency check |
+| `sdd_get_context` | View project state and artifacts |
+
+### Prompts
 
 | Prompt | Description |
 |---|---|
-| `/sdd-start` | Start a new SDD project (guided workflow) |
-| `/sdd-status` | Check current pipeline status |
+| `/sdd-start` | Start a new SDD project |
+| `/sdd-status` | Check pipeline status |
 
 ---
 
-## What Gets Generated
+## Hoofy vs Plan Mode
 
-SDD-Hoffy creates a `sdd/` directory in your project:
+If you use Cursor, Claude Code, Codex, or similar tools, you've probably used plan mode. They're complementary:
 
 ```
-sdd/
-├── sdd.json              # Project config (mode, stage, clarity score)
-├── proposal.md           # Stage 1: Structured proposal
-├── requirements.md       # Stage 2: Formal requirements with MoSCoW IDs
-├── clarifications.md     # Stage 3: Clarity Gate Q&A log
-├── design.md             # Stage 4: Technical architecture & ADRs
-├── tasks.md              # Stage 5: Atomic implementation tasks
-├── validation.md         # Stage 6: Cross-artifact consistency report
-├── changes/              # Change pipeline artifacts
-│   ├── fix-login-timeout/
-│   │   ├── manifest.json # Change metadata and state
-│   │   ├── describe.md   # Stage artifact
-│   │   ├── tasks.md      # Stage artifact
-│   │   └── verify.md     # Stage artifact
-│   └── feature-dark-mode/
-│       ├── manifest.json
-│       ├── propose.md
-│       ├── spec.md
-│       ├── ...
-│       └── verify.md
-└── history/              # Archived completed changes
+┌─────────────────────────────────────────────┐
+│  Hoofy (Requirements + Memory Layer)        │
+│  WHO are the users? WHAT must the system    │
+│  do? What happened in yesterday's session?  │
+├─────────────────────────────────────────────┤
+│  /plan mode (Implementation Layer)          │
+│  What files? What functions? What tests?    │
+└─────────────────────────────────────────────┘
 ```
 
-These files are designed to be:
-- **Human-readable** — Clear markdown that anyone can understand
-- **AI-consumable** — Structured enough that AI tools can parse and follow them
-- **Version-controllable** — Plain text files that live in your repo
-- **Feedable to plan mode** — Drop them as context into any AI coding tool
+**Hoofy is the architect. Plan mode is the contractor.** You wouldn't hire a contractor without blueprints — and you shouldn't use plan mode without specifications.
 
 ---
 
 ## The Research Behind SDD
 
-SDD-Hoffy isn't built on opinions. It's built on research:
+Hoofy's specification pipeline isn't built on opinions. It's built on research:
 
-- **METR 2025**: In a randomized controlled trial, experienced developers were [19% slower with AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) despite feeling 20% faster — because unstructured AI usage introduces debugging overhead and false confidence.
+- **METR 2025**: Experienced developers were [19% slower with AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) despite feeling 20% faster — unstructured AI usage introduces debugging overhead and false confidence.
 
-- **DORA 2025 State of DevOps**: Organizations see a [7.2% increase in delivery instability](https://dora.dev/research/2025/dora-report/) for every 25% increase in AI adoption — when adopted without foundational systems and practices.
+- **DORA 2025**: [7.2% delivery instability increase](https://dora.dev/research/2025/dora-report/) for every 25% AI adoption — without foundational systems and practices.
 
-- **McKinsey 2025**: Top-performing teams achieve [16-30% productivity gains with AI](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/superagency-in-the-workplace-empowering-people-to-unlock-ais-full-potential-at-work) — but only when they invest in structured specification and communication.
+- **McKinsey 2025**: Top performers see [16-30% productivity gains](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/superagency-in-the-workplace-empowering-people-to-unlock-ais-full-potential-at-work) only with structured specification and communication.
 
-- **Requirements Engineering (IEEE)**: The cost of fixing a requirement error found in production is [10-100x more expensive](https://ieeexplore.ieee.org/document/720574) than fixing it during the requirements phase. This multiplier is even worse with AI-generated code, where hallucinated requirements propagate through entire codebases.
+- **IEEE Requirements Engineering**: Fixing a requirement error in production costs [10-100x more](https://ieeexplore.ieee.org/document/720574) than fixing it during requirements. This multiplier is worse with AI-generated code.
 
-The common thread: **structure beats speed**. SDD-Hoffy forces that structure before a single line of code is written.
+**Structure beats speed.**
 
 ---
 
 ## Contributing
 
-SDD-Hoffy is open source and we welcome contributions!
-
-### Development
-
 ```bash
-# Clone the repo
-git clone https://github.com/HendryAvila/sdd-hoffy.git
-cd sdd-hoffy
-
-# Build
-make build
-
-# Run
-./bin/sdd-hoffy serve
-
-# Run tests
-make test
-
-# Lint
-make lint
+git clone https://github.com/HendryAvila/Hoofy.git
+cd Hoofy
+make build        # Build binary
+make test         # Tests with race detector
+make lint         # golangci-lint
+./bin/hoofy serve # Run the MCP server
 ```
 
-### Areas for Contribution
+### Areas for contribution
 
-- **More clarity dimensions** — Domain-specific dimensions (mobile, API, data pipeline, etc.)
-- **More change types** — Extend the change pipeline with new types beyond fix/feature/refactor/enhancement
-- **Template improvements** — Better guided mode templates and examples
-- **Host-specific guides** — Documentation for configuring in specific tools
-- **Streamable HTTP transport** — Remote server deployment support
-- **Template customization** — Bring your own templates
-- **Project presets** — Web app, API, CLI, mobile starter configs
-- **Export formats** — Jira, Linear, GitHub Issues integration
-- **i18n** — Support for non-English specs
-- **Tests** — Unit and integration tests
-
----
-
-## Roadmap
-
-- [x] Full 7-stage project pipeline: Init, Propose, Specify, Clarify, Design, Tasks, Validate
-- [x] Dual mode (Guided/Expert)
-- [x] MCP server with stdio transport
-- [x] CI/CD pipeline (GitHub Actions + GoReleaser)
-- [x] Multi-platform binary releases (Linux, macOS, Windows)
-- [x] Cross-artifact validation with PASS/WARN/FAIL verdicts
-- [x] One-liner install script
-- [x] Self-update system (`sdd-hoffy update`)
-- [x] Adaptive change pipeline (feature, fix, refactor, enhancement × small/medium/large)
-- [x] Architecture Decision Records (ADRs) as first-class concept
-- [x] Memory bridge integration for change events
-- [ ] Streamable HTTP transport (for remote server deployment)
-- [ ] Template customization (bring your own templates)
-- [ ] Project presets (web app, API, CLI, mobile, etc.)
-- [ ] Export to external formats (Jira, Linear, GitHub Issues)
+- More clarity dimensions (mobile, API, data pipeline)
+- More change types beyond fix/feature/refactor/enhancement
+- Template improvements and customization
+- Streamable HTTP transport for remote deployment
+- Export to Jira, Linear, GitHub Issues
+- i18n for non-English specs
 
 ---
 
 ## License
 
-[MIT](LICENSE) — Use it, fork it, build on it. That's what open source is for.
+[MIT](LICENSE)
 
 ---
 
 <p align="center">
   <strong>Stop prompting. Start specifying.</strong><br>
-  Built with care by the SDD-Hoffy community.
+  Built with care by the Hoofy community.
 </p>
