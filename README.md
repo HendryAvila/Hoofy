@@ -22,15 +22,24 @@ The root cause? Ambiguity. When you tell an AI "build me an app", it fills in th
 
 ## The Solution: Spec-Driven Development
 
-SDD-Hoffy solves this with a complete 7-stage pipeline:
+SDD-Hoffy solves this with **two complementary pipelines**:
 
+**Project Pipeline** — Full greenfield specification:
 ```
 Vague Idea → Proposal → Requirements → Clarity Gate → Architecture → Tasks → Validation → Ready for AI
+```
+
+**Change Pipeline** — Adaptive ongoing development:
+```
+Change (type + size) → [describe/propose/scope] → [spec] → [clarify] → [design] → tasks → verify
+                        └─── stages selected automatically based on type × size ───┘
 ```
 
 The **Clarity Gate** is the core innovation. It analyzes your requirements across 8 dimensions and blocks progress until ambiguities are resolved. The AI can't skip ahead to architecture until your specs are clear enough.
 
 After the gate, SDD-Hoffy continues into **technical design**, **atomic task breakdown**, and a **cross-artifact validation** that catches inconsistencies before a single line of code is written.
+
+For ongoing work, the **Change Pipeline** adapts the number of stages to the size and type of change — a small bug fix gets 3 stages, a large feature gets 6.
 
 ---
 
@@ -100,6 +109,8 @@ SDD-Hoffy doesn't replace plan mode. It makes plan mode **dramatically better** 
 | **Install** | One-liner install + auto-update | npm/pip, dependencies |
 | **Dual mode** | Guided (beginners) + Expert (devs) | One size fits all |
 | **Full pipeline** | Idea → Specs → Architecture → Tasks → Validation | Specs only |
+| **Change pipeline** | Adaptive flows for ongoing dev (12 variants) | None |
+| **ADRs** | First-class Architecture Decision Records | None |
 
 ---
 
@@ -309,13 +320,26 @@ Do NOT start coding without specs for any non-trivial change.
 
 ---
 
-## The SDD Pipeline
+## Two Pipelines, One Server
 
-SDD-Hoffy follows a sequential 7-stage pipeline. Each stage builds on the previous one, and you can't skip ahead until the current stage is complete.
+SDD-Hoffy has **two independent pipelines** that serve different purposes:
+
+| Pipeline | Purpose | When to use |
+|---|---|---|
+| **Project Pipeline** | Full greenfield specification (7 stages) | Starting a new project from scratch |
+| **Change Pipeline** | Adaptive workflow for ongoing development | Features, fixes, refactors, enhancements |
+
+The **Project Pipeline** is the architect's blueprint. The **Change Pipeline** is the ongoing construction management. Both run independently and can coexist in the same project.
+
+---
+
+## The Project Pipeline
+
+SDD-Hoffy's project pipeline follows a sequential 7-stage process. Each stage builds on the previous one, and you can't skip ahead until the current stage is complete.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│                     SDD Pipeline                         │
+│                  Project Pipeline                        │
 │                                                          │
 │  ┌──────┐   ┌─────────┐   ┌─────────┐   ┌────────────┐   │
 │  │ INIT │──▶│ PROPOSE │──▶│ SPECIFY │──▶│  CLARIFY     │
@@ -416,6 +440,73 @@ If validation fails, SDD-Hoffy tells you exactly which stage to revisit and what
 
 ---
 
+## The Change Pipeline
+
+Once your project is running, you need a lighter process for ongoing work. The change pipeline adapts its stages based on **what you're doing** and **how big the change is**.
+
+### How it works
+
+1. **Create a change** — Tell SDD-Hoffy what kind of work it is (feature, fix, refactor, enhancement) and how big it is (small, medium, large)
+2. **Follow the flow** — The pipeline selects the right stages automatically
+3. **Advance through stages** — Save content at each stage, advance to the next
+4. **Verify and archive** — Final verification, then archive for history
+
+### Adaptive stage flows
+
+The pipeline automatically selects the right number of stages. Small changes get 3 stages, large ones get up to 6:
+
+```
+                    Small           Medium              Large
+                    ─────           ──────              ─────
+Fix             describe→tasks    describe→spec       describe→spec→design
+                  →verify          →tasks→verify        →tasks→verify
+
+Feature         describe→tasks    propose→spec        propose→spec→clarify
+                  →verify          →tasks→verify        →design→tasks→verify
+
+Refactor        scope→tasks       scope→design        scope→spec→design
+                  →verify          →tasks→verify        →tasks→verify
+
+Enhancement     describe→tasks    propose→spec        propose→spec→clarify
+                  →verify          →tasks→verify        →design→tasks→verify
+```
+
+That's **12 different flow variants** — all deterministic, no guessing.
+
+### ADRs (Architecture Decision Records)
+
+ADRs are a first-class concept. Record architectural decisions at any point during a change:
+
+```
+sdd_adr(title: "PostgreSQL over MongoDB", status: "accepted",
+        context: "Need ACID for financial data",
+        decision: "Use PostgreSQL 16",
+        consequences: "Need migration tooling, team training")
+```
+
+ADRs support lifecycle management: `proposed` → `accepted` → `deprecated` (or `rejected`).
+
+### One active change at a time
+
+SDD-Hoffy enforces focus. You can only have one active change at a time. Complete or archive the current one before starting the next. This prevents scope creep and context switching.
+
+### Change artifacts
+
+Each change gets its own directory under `sdd/changes/`:
+
+```
+sdd/changes/
+└── fix-login-timeout/
+    ├── manifest.json       # Change metadata (type, size, status, stages)
+    ├── describe.md         # What's the problem/feature?
+    ├── spec.md             # Formal requirements (medium+ changes)
+    ├── design.md           # Technical approach (large changes)
+    ├── tasks.md            # Implementation breakdown
+    └── verify.md           # Verification checklist
+```
+
+---
+
 ## Dual Mode
 
 SDD-Hoffy adapts to your experience level:
@@ -442,6 +533,8 @@ sdd_init_project(name: "my-app", description: "...", mode: "guided")
 
 ## Available Tools
 
+### Project Pipeline
+
 | Tool | Stage | Description |
 |---|---|---|
 | `sdd_init_project` | 0 | Initialize SDD project structure |
@@ -452,6 +545,15 @@ sdd_init_project(name: "my-app", description: "...", mode: "guided")
 | `sdd_create_tasks` | 5 | Save the atomic implementation task breakdown |
 | `sdd_validate` | 6 | Run cross-artifact consistency check |
 | `sdd_get_context` | Any | View current project state and artifacts |
+
+### Change Pipeline
+
+| Tool | Description |
+|---|---|
+| `sdd_change` | Create a new change (feature, fix, refactor, enhancement) with size selection |
+| `sdd_change_advance` | Save stage content and advance to the next stage |
+| `sdd_change_status` | View current change status, stages, and artifacts |
+| `sdd_adr` | Create or update Architecture Decision Records |
 
 ## Available Prompts
 
@@ -475,6 +577,18 @@ sdd/
 ├── design.md             # Stage 4: Technical architecture & ADRs
 ├── tasks.md              # Stage 5: Atomic implementation tasks
 ├── validation.md         # Stage 6: Cross-artifact consistency report
+├── changes/              # Change pipeline artifacts
+│   ├── fix-login-timeout/
+│   │   ├── manifest.json # Change metadata and state
+│   │   ├── describe.md   # Stage artifact
+│   │   ├── tasks.md      # Stage artifact
+│   │   └── verify.md     # Stage artifact
+│   └── feature-dark-mode/
+│       ├── manifest.json
+│       ├── propose.md
+│       ├── spec.md
+│       ├── ...
+│       └── verify.md
 └── history/              # Archived completed changes
 ```
 
@@ -529,6 +643,7 @@ make lint
 ### Areas for Contribution
 
 - **More clarity dimensions** — Domain-specific dimensions (mobile, API, data pipeline, etc.)
+- **More change types** — Extend the change pipeline with new types beyond fix/feature/refactor/enhancement
 - **Template improvements** — Better guided mode templates and examples
 - **Host-specific guides** — Documentation for configuring in specific tools
 - **Streamable HTTP transport** — Remote server deployment support
@@ -542,7 +657,7 @@ make lint
 
 ## Roadmap
 
-- [x] Full 7-stage pipeline: Init, Propose, Specify, Clarify, Design, Tasks, Validate
+- [x] Full 7-stage project pipeline: Init, Propose, Specify, Clarify, Design, Tasks, Validate
 - [x] Dual mode (Guided/Expert)
 - [x] MCP server with stdio transport
 - [x] CI/CD pipeline (GitHub Actions + GoReleaser)
@@ -550,6 +665,9 @@ make lint
 - [x] Cross-artifact validation with PASS/WARN/FAIL verdicts
 - [x] One-liner install script
 - [x] Self-update system (`sdd-hoffy update`)
+- [x] Adaptive change pipeline (feature, fix, refactor, enhancement × small/medium/large)
+- [x] Architecture Decision Records (ADRs) as first-class concept
+- [x] Memory bridge integration for change events
 - [ ] Streamable HTTP transport (for remote server deployment)
 - [ ] Template customization (bring your own templates)
 - [ ] Project presets (web app, API, CLI, mobile, etc.)
