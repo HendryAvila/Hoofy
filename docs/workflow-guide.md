@@ -7,6 +7,7 @@ This guide walks you through real workflows using Hoofy's three systems: **Memor
 ## Table of Contents
 
 - [Which System Do I Use?](#which-system-do-i-use)
+- [Workflow 0: Explore Before You Plan](#workflow-0-explore-before-you-plan)
 - [Workflow 1: New Project (Greenfield)](#workflow-1-new-project-greenfield)
 - [Workflow 2: Changes in an Existing Project](#workflow-2-changes-in-an-existing-project)
 - [Workflow 3: Memory Best Practices](#workflow-3-memory-best-practices)
@@ -18,12 +19,59 @@ This guide walks you through real workflows using Hoofy's three systems: **Memor
 
 | I want to... | Use this | First command |
 |---|---|---|
+| Think through an idea before committing | **Explore** | `sdd_explore` |
 | Build something from scratch | **Project Pipeline** | `sdd_init_project` |
 | Add a feature to existing code | **Change Pipeline** | `sdd_change(type: "feature", size: "medium")` |
 | Fix a bug | **Change Pipeline** | `sdd_change(type: "fix", size: "small")` |
 | Refactor code | **Change Pipeline** | `sdd_change(type: "refactor", size: "medium")` |
 | Remember a decision or discovery | **Memory** | `mem_save` |
 | Pick up where I left off | **Memory** | `mem_context` |
+
+---
+
+## Workflow 0: Explore Before You Plan
+
+Before jumping into a pipeline, use `sdd_explore` to capture unstructured thinking. This is especially useful when you're discussing an idea with the AI and haven't decided on scope or approach yet.
+
+### When to use it
+
+- You're brainstorming with the AI and want to capture the discussion
+- You know the problem but aren't sure about the solution
+- You have constraints or preferences the AI should know before planning
+- You want the AI to suggest whether this is a small fix or a large feature
+
+### How it works
+
+> **You**: "I want to add search to the app. Maybe full-text? Not sure if I need fuzzy matching. It has to be fast — under 100ms."
+
+> **AI**: *Calls `sdd_explore` with:*
+> - **Goals**: Add search functionality to the app
+> - **Constraints**: Response time under 100ms
+> - **Unknowns**: Full-text vs. fuzzy matching, search scope (all fields or specific ones?)
+> - **Preferences**: Performance is a priority
+
+The context is saved to memory with a topic key. If the discussion evolves:
+
+> **You**: "Actually, let's do full-text with SQLite FTS5 — no external dependencies."
+
+> **AI**: *Calls `sdd_explore` again — upserts the same observation with updated decisions*
+
+### What you get
+
+- Structured context in memory that the AI references when you start a pipeline
+- A suggested change type and size based on keywords (e.g., "new feature, medium complexity")
+- No duplicates — repeated calls update the same observation via topic key
+
+### Then what?
+
+After exploring, start the right pipeline:
+
+```
+sdd_explore → sdd_change(type: "feature", size: "medium")
+sdd_explore → sdd_init_project  (if it's greenfield)
+```
+
+The AI already has your goals, constraints, and decisions in memory — the pipeline starts with clarity.
 
 ---
 
@@ -132,6 +180,7 @@ The AI breaks the design into atomic, implementable tasks. Each task has:
 - Dependencies on other tasks
 - Acceptance criteria (checkboxes)
 - A dependency graph showing parallelization opportunities
+- Optional **wave assignments** — tasks grouped into parallel execution waves (see [Wave Assignments](#wave-assignments) below)
 
 > **AI**: *"TASK-001: Set up project scaffolding → TASK-002: Implement habit storage → TASK-003: Add CLI commands..."*
 > **AI**: *Writes tasks to `sdd/tasks.md`*
@@ -237,6 +286,30 @@ At any point during a change, you can capture a decision:
 
 ADRs are saved both in the change directory and in persistent memory — they survive archival.
 
+### Wave Assignments
+
+When the AI creates the task breakdown (in either pipeline), it can optionally group tasks into parallel execution waves:
+
+```markdown
+**Wave 1** (parallel — no dependencies):
+- TASK-001: Project scaffolding
+- TASK-002: Database schema
+
+**Wave 2** (parallel — depends on Wave 1):
+- TASK-003: API endpoints
+- TASK-004: Auth module
+
+**Wave 3** (sequential — depends on Wave 2):
+- TASK-005: Integration tests
+```
+
+The algorithm is simple: tasks with no dependencies go in Wave 1, tasks depending only on Wave 1 go in Wave 2, and so on. This tells you:
+- Which tasks can run in parallel (same wave)
+- Which must wait (later wave)
+- The critical path through the implementation
+
+The AI generates wave assignments automatically when the dependency graph has parallelization opportunities. They appear in the `tasks.md` artifact alongside the dependency graph.
+
 ---
 
 ## Workflow 3: Memory Best Practices
@@ -285,6 +358,28 @@ flowchart LR
 ### Topic Keys (Evolving Knowledge)
 
 For knowledge that changes over time, use topic keys. Instead of creating 10 observations about the "database schema", the AI uses `topic_key: "architecture/database-schema"` — each new save **updates** the existing observation instead of creating a duplicate.
+
+### Knowledge Graph
+
+Observations can be connected with typed, directional relations to form a knowledge graph:
+
+| Relation | Meaning | Example |
+|---|---|---|
+| `relates_to` | General association | A pattern relates to a convention |
+| `depends_on` | A requires B | A task depends on a design decision |
+| `caused_by` | A was triggered by B | A bugfix was caused by a discovery |
+| `implements` | A realizes B | Code implements a design decision |
+| `supersedes` | A replaces B | A new decision supersedes an old one |
+| `part_of` | A belongs to B | A component is part of an architecture |
+
+The AI creates relations automatically when it recognizes connections between observations. You can also ask it explicitly: *"relate the JWT decision to the auth bugfix"*.
+
+**Traversing the graph**: Use `mem_build_context` with a starting observation and depth to pull in everything connected. This is powerful for understanding the full context around a decision — what caused it, what implements it, what it relates to.
+
+```
+mem_build_context(observation_id: 42, max_depth: 2)
+→ Returns the observation, its direct relations, and their relations
+```
 
 ---
 

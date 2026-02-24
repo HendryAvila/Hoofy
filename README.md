@@ -26,17 +26,32 @@ Hoofy is three systems in one MCP server:
 
 | System | What it does | Tools |
 |---|---|---|
-| **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. Decisions, bugs, patterns, discoveries — with a knowledge graph that connects observations into a navigable web. Your AI remembers what happened yesterday. | 17 `mem_*` tools |
-| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Tasks include optional wave assignments for parallel execution. | 4 `sdd_change*` + `sdd_adr` |
+| **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. Decisions, bugs, patterns, discoveries — your AI remembers what happened yesterday. | 17 `mem_*` tools |
+| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). | 4 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate that blocks hallucinations. | 8 `sdd_*` tools |
-| **Explore** | Pre-pipeline context capture — goals, constraints, preferences, decisions. Saves structured context to memory before you start any pipeline. | `sdd_explore` |
 
 One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **31 tools total.**
+
+### Key Features
+
+**Knowledge Graph** — Memory observations aren't flat notes. You can connect them with typed, directional relations (`depends_on`, `caused_by`, `implements`, `supersedes`, `relates_to`, `part_of`) to build a navigable web of project knowledge. Use `mem_build_context` to traverse the graph from any observation and pull in related decisions, bugs, and patterns automatically.
+
+```
+Decision: "Switched to JWT"  →(caused_by)→  Discovery: "Session storage doesn't scale"
+    ↑(implements)                               ↑(relates_to)
+Bugfix: "Fixed token expiry"              Pattern: "Retry with backoff"
+```
+
+**Pre-pipeline Exploration** — Before committing to a pipeline, use `sdd_explore` to capture unstructured thinking — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory via topic key upsert (call it multiple times as your thinking evolves — it updates, never duplicates). It also suggests a change type and size based on keywords, so you start the right pipeline.
+
+**Wave Assignments** — When creating tasks (in either pipeline), the AI can group them into parallel execution waves derived from the dependency graph. Wave 1 has no dependencies, Wave 2 depends only on Wave 1, and so on. This tells you exactly which tasks can run in parallel and which must wait — useful for team coordination or just knowing the critical path.
 
 ### How it flows
 
 ```mermaid
 flowchart TB
+    explore["sdd_explore\n(goals, constraints, unknowns)"]
+
     subgraph project ["New Project (greenfield)"]
         direction LR
         P1[Init] --> P2[Propose] --> P3[Requirements] --> P4{Clarity Gate}
@@ -53,9 +68,15 @@ flowchart TB
 
     subgraph memory ["Memory (always active)"]
         direction LR
-        M1[Session Start] --> M2["Work + Save Discoveries"] --> M3[Session Summary]
+        M1[Session Start] --> M2["Work + Save Discoveries"]
+        M2 --> M3["Connect with Relations"]
+        M3 --> M4[Session Summary]
     end
 
+    explore -.->|"captures context before"| project
+    explore -.->|"captures context before"| change
+
+    style explore fill:#8b5cf6,stroke:#7c3aed,color:#fff
     style P4 fill:#f59e0b,stroke:#d97706,color:#000
     style P7 fill:#10b981,stroke:#059669,color:#fff
     style C5 fill:#10b981,stroke:#059669,color:#fff
@@ -111,7 +132,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
-> The **MCP server** is Hoofy itself — the binary you just installed. It provides 31 tools (memory, change pipeline, project pipeline, explore) and works with **any** MCP-compatible AI tool.
+ > The **MCP server** is Hoofy itself — the binary you just installed. It provides 31 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
 >
@@ -313,7 +334,7 @@ The three cheapest stages (describe + tasks + verify) take under 2 minutes and s
 
 ### 2. Explore before you plan
 
-Before jumping into a pipeline, use `sdd_explore` to capture context from your discussion — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory and even suggests change type/size based on keywords. Call it multiple times as your thinking evolves — it upserts, never duplicates.
+Before jumping into a pipeline, use `sdd_explore` to capture context from your discussion — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory so the pipeline starts with clarity, not guesswork. Call it multiple times as your thinking evolves — it upserts, never duplicates.
 
 ### 3. Right-size your changes
 
@@ -334,15 +355,7 @@ You don't need to tell the AI to use memory — Hoofy's built-in instructions ha
 
 ### 5. Connect knowledge with relations
 
-Hoofy's knowledge graph lets you connect related observations with typed, directional edges — turning flat memories into a navigable web.
-
-```
-Decision: "Switched to JWT"  →(caused_by)→  Discovery: "Session storage doesn't scale"
-    ↑(implements)                               ↑(relates_to)
-Bugfix: "Fixed token expiry"              Pattern: "Retry with backoff"
-```
-
-The AI creates relations automatically when it recognizes connections. You can also ask it to relate observations manually. Use `mem_build_context` to explore the full graph around any observation.
+Hoofy's knowledge graph lets you connect related observations with typed, directional edges — turning flat memories into a navigable web. The AI creates relations automatically when it recognizes connections. You can also ask it to relate observations manually. Use `mem_build_context` to explore the full graph around any observation.
 
 ### 6. Use topic keys for evolving knowledge
 
