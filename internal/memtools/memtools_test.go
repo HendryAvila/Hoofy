@@ -1000,9 +1000,11 @@ func TestBuildContextTool_Success(t *testing.T) {
 	id1 := seedObservation(t, store, "Root node", "Root context content", "my-app")
 	id2 := seedObservation(t, store, "Child node", "Child context content", "my-app")
 
-	store.AddRelation(memory.AddRelationParams{
+	if _, err := store.AddRelation(memory.AddRelationParams{
 		FromID: id1, ToID: id2, Type: "implements",
-	})
+	}); err != nil {
+		t.Fatalf("AddRelation: %v", err)
+	}
 
 	tool := NewBuildContextTool(store)
 
@@ -1074,9 +1076,11 @@ func TestGetObservationTool_ShowsRelations(t *testing.T) {
 	id1 := seedObservation(t, store, "Obs with rels", "Content with relations", "my-app")
 	id2 := seedObservation(t, store, "Related obs", "Related content", "my-app")
 
-	store.AddRelation(memory.AddRelationParams{
+	if _, err := store.AddRelation(memory.AddRelationParams{
 		FromID: id1, ToID: id2, Type: "depends_on", Note: "critical dependency",
-	})
+	}); err != nil {
+		t.Fatalf("AddRelation: %v", err)
+	}
 
 	tool := NewGetObservationTool(store)
 
@@ -1128,9 +1132,11 @@ func TestGetObservationTool_IncomingRelations(t *testing.T) {
 	id2 := seedObservation(t, store, "Source obs", "Source content", "my-app")
 
 	// id2 → id1 (incoming from id1's perspective)
-	store.AddRelation(memory.AddRelationParams{
+	if _, err := store.AddRelation(memory.AddRelationParams{
 		FromID: id2, ToID: id1, Type: "caused_by",
-	})
+	}); err != nil {
+		t.Fatalf("AddRelation: %v", err)
+	}
 
 	tool := NewGetObservationTool(store)
 

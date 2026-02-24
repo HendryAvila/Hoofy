@@ -131,10 +131,10 @@ func (t *ExploreTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	// Build response.
 	var sb strings.Builder
 	sb.WriteString("## Exploration Context Saved\n\n")
-	sb.WriteString(fmt.Sprintf("**Title:** %s\n", title))
-	sb.WriteString(fmt.Sprintf("**Topic Key:** %s\n", topicKey))
-	sb.WriteString(fmt.Sprintf("**Action:** %s\n", action))
-	sb.WriteString(fmt.Sprintf("**ID:** %d\n\n", id))
+	fmt.Fprintf(&sb, "**Title:** %s\n", title)
+	fmt.Fprintf(&sb, "**Topic Key:** %s\n", topicKey)
+	fmt.Fprintf(&sb, "**Action:** %s\n", action)
+	fmt.Fprintf(&sb, "**ID:** %d\n\n", id)
 
 	sb.WriteString("### Captured Context\n\n")
 	sb.WriteString(content)
@@ -148,8 +148,8 @@ func (t *ExploreTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	allText := gatherAllText(merged)
 	sugType, sugSize, reasoning := suggestChangeType(allText)
 	sb.WriteString("\n### Type/Size Suggestion\n\n")
-	sb.WriteString(fmt.Sprintf("- **Suggested type:** %s — %s\n", sugType, reasoning))
-	sb.WriteString(fmt.Sprintf("- **Suggested size:** %s\n", sugSize))
+	fmt.Fprintf(&sb, "- **Suggested type:** %s — %s\n", sugType, reasoning)
+	fmt.Fprintf(&sb, "- **Suggested size:** %s\n", sugSize)
 
 	return mcp.NewToolResultText(sb.String()), nil
 }
@@ -174,7 +174,7 @@ func formatExploreContent(sections map[string]string) string {
 		if v == "" {
 			continue
 		}
-		sb.WriteString(fmt.Sprintf("## %s\n\n%s\n\n", cat, v))
+		fmt.Fprintf(&sb, "## %s\n\n%s\n\n", cat, v)
 	}
 	return strings.TrimRight(sb.String(), "\n")
 }

@@ -217,7 +217,9 @@ func TestExploreTool_Handle_UpsertOverride(t *testing.T) {
 		"title": "Override Test",
 		"goals": "Original goals",
 	})
-	tool.Handle(context.Background(), req1)
+	if _, err := tool.Handle(context.Background(), req1); err != nil {
+		t.Fatalf("first Handle: %v", err)
+	}
 
 	// Second call overrides goals.
 	req2 := exploreReq(map[string]interface{}{

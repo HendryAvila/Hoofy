@@ -927,7 +927,7 @@ func (s *Store) AddRelation(p AddRelationParams) ([]int64, error) {
 			return nil, fmt.Errorf("checking observation %d: %w", id, err)
 		}
 		found := row.Next()
-		row.Close()
+		_ = row.Close()
 		if !found {
 			return nil, fmt.Errorf("observation %d not found or is deleted", id)
 		}
@@ -1014,7 +1014,7 @@ func (s *Store) GetRelations(observationID int64) ([]Relation, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying relations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []Relation
 	for rows.Next() {
@@ -1093,16 +1093,16 @@ func (s *Store) BuildContext(observationID int64, maxDepth int) (*ContextResult,
 			}
 
 			if !row.Next() {
-				row.Close()
+				_ = row.Close()
 				continue // skip if observation was hard-deleted between queries
 			}
 
 			var node ContextNode
 			if err := row.Scan(&node.ID, &node.Title, &node.Type, &node.Project, &node.CreatedAt); err != nil {
-				row.Close()
+				_ = row.Close()
 				continue // skip if scan fails
 			}
-			row.Close()
+			_ = row.Close()
 
 			nodeDepth := current.depth + 1
 			node.RelationType = rel.Type

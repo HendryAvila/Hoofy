@@ -1896,8 +1896,8 @@ func TestGetRelations_Bidirectional(t *testing.T) {
 	id3 := mustAddObs(t, s, "sess", "Get C", "Content get C", "proj")
 
 	// id1 → id2, id3 → id1
-	s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
-	s.AddRelation(memory.AddRelationParams{FromID: id3, ToID: id1, Type: "caused_by"})
+	mustAddRel(t, s, id1, id2, "relates_to")
+	mustAddRel(t, s, id3, id1, "caused_by")
 
 	rels, err := s.GetRelations(id1)
 	if err != nil {
@@ -1947,7 +1947,7 @@ func TestRelations_HardDeleteCascade(t *testing.T) {
 	id1 := mustAddObs(t, s, "sess", "Cascade A", "Content cascade A", "proj")
 	id2 := mustAddObs(t, s, "sess", "Cascade B", "Content cascade B", "proj")
 
-	s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
+	mustAddRel(t, s, id1, id2, "relates_to")
 
 	// Hard-delete id2 → relation should CASCADE delete
 	_ = s.DeleteObservation(id2, true)
@@ -1965,7 +1965,7 @@ func TestRelations_SoftDeleteNoEffect(t *testing.T) {
 	id1 := mustAddObs(t, s, "sess", "Soft A", "Content soft A", "proj")
 	id2 := mustAddObs(t, s, "sess", "Soft B", "Content soft B", "proj")
 
-	s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
+	mustAddRel(t, s, id1, id2, "relates_to")
 
 	// Soft-delete id2 → relation should REMAIN (soft-delete only sets deleted_at, no row deletion)
 	_ = s.DeleteObservation(id2, false)
@@ -1984,7 +1984,7 @@ func TestBuildContext_Depth1(t *testing.T) {
 	child := mustAddObs(t, s, "sess", "Child", "Child observation content", "proj")
 	_ = child
 
-	s.AddRelation(memory.AddRelationParams{FromID: root, ToID: child, Type: "relates_to"})
+	mustAddRel(t, s, root, child, "relates_to")
 
 	result, err := s.BuildContext(root, 1)
 	if err != nil {
@@ -2023,8 +2023,8 @@ func TestBuildContext_Depth2Chain(t *testing.T) {
 	c := mustAddObs(t, s, "sess", "Node C", "Content node C chain", "proj")
 
 	// A → B → C
-	s.AddRelation(memory.AddRelationParams{FromID: a, ToID: b, Type: "depends_on"})
-	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: c, Type: "implements"})
+	mustAddRel(t, s, a, b, "depends_on")
+	mustAddRel(t, s, b, c, "implements")
 
 	result, err := s.BuildContext(a, 2)
 	if err != nil {
@@ -2059,8 +2059,8 @@ func TestBuildContext_Depth1DoesNotReachDepth2(t *testing.T) {
 	b := mustAddObs(t, s, "sess", "Limit B", "Content limit B", "proj")
 	c := mustAddObs(t, s, "sess", "Limit C", "Content limit C", "proj")
 
-	s.AddRelation(memory.AddRelationParams{FromID: a, ToID: b, Type: "relates_to"})
-	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: c, Type: "relates_to"})
+	mustAddRel(t, s, a, b, "relates_to")
+	mustAddRel(t, s, b, c, "relates_to")
 
 	result, err := s.BuildContext(a, 1)
 	if err != nil {
@@ -2081,9 +2081,9 @@ func TestBuildContext_CycleDetection(t *testing.T) {
 	c := mustAddObs(t, s, "sess", "Cycle C", "Content cycle C", "proj")
 
 	// A → B → C → A (cycle)
-	s.AddRelation(memory.AddRelationParams{FromID: a, ToID: b, Type: "relates_to"})
-	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: c, Type: "relates_to"})
-	s.AddRelation(memory.AddRelationParams{FromID: c, ToID: a, Type: "relates_to"})
+	mustAddRel(t, s, a, b, "relates_to")
+	mustAddRel(t, s, b, c, "relates_to")
+	mustAddRel(t, s, c, a, "relates_to")
 
 	result, err := s.BuildContext(a, 5)
 	if err != nil {
@@ -2165,7 +2165,7 @@ func TestBuildContext_IncomingRelations(t *testing.T) {
 	b := mustAddObs(t, s, "sess", "Source", "Content source incoming", "proj")
 
 	// B → A (from A's perspective, this is incoming)
-	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: a, Type: "caused_by"})
+	mustAddRel(t, s, b, a, "caused_by")
 
 	result, err := s.BuildContext(a, 1)
 	if err != nil {
@@ -2219,6 +2219,13 @@ func mustAddObs(t *testing.T, s *memory.Store, sessID, title, content, project s
 		t.Fatalf("mustAddObs(%q): %v", title, err)
 	}
 	return id
+}
+
+func mustAddRel(t *testing.T, s *memory.Store, fromID, toID int64, relType string) {
+	t.Helper()
+	if _, err := s.AddRelation(memory.AddRelationParams{FromID: fromID, ToID: toID, Type: relType}); err != nil {
+		t.Fatalf("AddRelation %d→%d (%s): %v", fromID, toID, relType, err)
+	}
 }
 
 func TestExtractLearnings_MarkdownStripped(t *testing.T) {
