@@ -29,8 +29,9 @@ Hoofy is three systems in one MCP server:
 | **Memory** | Persistent context across sessions — decisions, bugs, patterns, discoveries. Knowledge graph relations connect observations into a navigable web. Your AI remembers what happened yesterday. | 17 `mem_*` tools |
 | **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). | 4 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate that blocks hallucinations. | 8 `sdd_*` tools |
+| **Explore** | Pre-pipeline context capture — goals, constraints, preferences, decisions. Saves structured context to memory before you start any pipeline. | `sdd_explore` |
 
-One binary. Zero config. Works in **any** MCP-compatible AI tool. **30 tools total.**
+One binary. Zero config. Works in **any** MCP-compatible AI tool. **31 tools total.**
 
 ### How it flows
 
@@ -60,7 +61,7 @@ flowchart TB
     style C5 fill:#10b981,stroke:#059669,color:#fff
 ```
 
-> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (30 tools)](docs/tool-reference.md)**
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (31 tools)](docs/tool-reference.md)**
 
 ---
 
@@ -110,7 +111,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
-> The **MCP server** is Hoofy itself — the binary you just installed. It provides 30 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
+> The **MCP server** is Hoofy itself — the binary you just installed. It provides 31 tools (memory, change pipeline, project pipeline, explore) and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that adds an agent personality, skills, lifecycle hooks, and auto-configures the MCP server for you. It's optional — you get full Hoofy functionality with just the MCP server.
 
@@ -302,7 +303,11 @@ The AI will try to jump straight to coding. Don't let it. For any non-trivial wo
 
 The three cheapest stages (describe + tasks + verify) take under 2 minutes and save hours of debugging hallucinated code.
 
-### 2. Right-size your changes
+### 2. Explore before you plan
+
+Before jumping into a pipeline, use `sdd_explore` to capture context from your discussion — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory and even suggests change type/size based on keywords. Call it multiple times as your thinking evolves — it upserts, never duplicates.
+
+### 3. Right-size your changes
 
 Don't use a large pipeline for a one-line fix. Don't use a small pipeline for a new authentication system.
 
@@ -312,14 +317,14 @@ Don't use a large pipeline for a one-line fix. Don't use a small pipeline for a 
 | Needs requirements or design thought | **medium** (4 stages) |
 | Affects architecture, multiple systems | **large** (5-6 stages) |
 
-### 3. Let memory work for you
+### 4. Let memory work for you
 
 You don't need to tell the AI to use memory — Hoofy's built-in instructions handle it. But you'll get better results if you:
 - **Start sessions by greeting the AI** — it triggers `mem_context` to load recent history
 - **Mention past decisions** — "remember when we chose SQLite?" triggers `mem_search`
 - **Confirm session summaries** — the AI writes them at session end, review them for accuracy
 
-### 4. Connect knowledge with relations
+### 5. Connect knowledge with relations
 
 Hoofy's knowledge graph lets you connect related observations with typed, directional edges — turning flat memories into a navigable web.
 
@@ -331,19 +336,19 @@ Bugfix: "Fixed token expiry"              Pattern: "Retry with backoff"
 
 The AI creates relations automatically when it recognizes connections. You can also ask it to relate observations manually. Use `mem_build_context` to explore the full graph around any observation.
 
-### 5. Use topic keys for evolving knowledge
+### 6. Use topic keys for evolving knowledge
 
 When a decision might change (database schema, API design, architecture), use `topic_key` in `mem_save`. This **updates** the existing observation instead of creating duplicates. One observation per topic, always current.
 
-### 6. One change at a time
+### 7. One change at a time
 
 Hoofy enforces one active change at a time. This isn't a limitation — it's a feature. Scope creep happens when you try to do three things at once. Finish one change, verify it, then start the next.
 
-### 7. Trust the Clarity Gate
+### 8. Trust the Clarity Gate
 
 When the Clarity Gate asks questions, don't rush past them. Every question it asks represents an ambiguity that would have become a bug, a hallucination, or a "that's not what I meant" moment. Two minutes answering questions saves two hours debugging wrong implementations.
 
-### 8. Hoofy is the architect, Plan mode is the contractor
+### 9. Hoofy is the architect, Plan mode is the contractor
 
 If your AI tool has a plan/implementation mode, use it **after** Hoofy specs are done. Hoofy answers WHO and WHAT. Plan mode answers HOW.
 

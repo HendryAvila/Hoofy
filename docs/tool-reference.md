@@ -1,6 +1,6 @@
 # Tool Reference
 
-Hoofy exposes **30 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
+Hoofy exposes **31 MCP tools** across four systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
 
 ---
 
@@ -47,6 +47,12 @@ Hoofy exposes **30 MCP tools** across three systems. The AI uses them proactivel
 | `sdd_create_tasks` | Save implementation task breakdown with dependency graph |
 | `sdd_validate` | Cross-artifact consistency check (requirements ↔ design ↔ tasks) |
 | `sdd_get_context` | View project state, pipeline status, and stage artifacts |
+
+## Explore (1 tool)
+
+| Tool | Description |
+|---|---|
+| `sdd_explore` | Pre-pipeline context capture — saves goals, constraints, tech preferences, unknowns, decisions, and references to memory. Upserts via topic key so you can call it multiple times as thinking evolves. Suggests change type/size based on keywords. |
 
 ## Prompts
 

@@ -506,6 +506,88 @@ func TestGetObservation_SoftDeletedHidden(t *testing.T) {
 	}
 }
 
+func TestFindByTopicKey_Found(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	_, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "explore",
+		Title:     "Auth Exploration",
+		Content:   "## Goals\n\nBuild auth",
+		Project:   "proj",
+		Scope:     "project",
+		TopicKey:  "explore/auth-exploration",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obs, err := s.FindByTopicKey("explore/auth-exploration", "proj", "project")
+	if err != nil {
+		t.Fatalf("FindByTopicKey: %v", err)
+	}
+	if obs == nil {
+		t.Fatal("expected to find observation, got nil")
+	}
+	if obs.Title != "Auth Exploration" {
+		t.Errorf("title = %q, want %q", obs.Title, "Auth Exploration")
+	}
+}
+
+func TestFindByTopicKey_NotFound(t *testing.T) {
+	s := newTestStore(t)
+
+	obs, err := s.FindByTopicKey("explore/nonexistent", "", "project")
+	if err != nil {
+		t.Fatalf("FindByTopicKey: %v", err)
+	}
+	if obs != nil {
+		t.Errorf("expected nil for nonexistent topic key, got ID=%d", obs.ID)
+	}
+}
+
+func TestFindByTopicKey_EmptyKey(t *testing.T) {
+	s := newTestStore(t)
+
+	obs, err := s.FindByTopicKey("", "", "project")
+	if err != nil {
+		t.Fatalf("FindByTopicKey: %v", err)
+	}
+	if obs != nil {
+		t.Error("expected nil for empty topic key")
+	}
+}
+
+func TestFindByTopicKey_SoftDeletedExcluded(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "explore",
+		Title:     "Deleted Explore",
+		Content:   "## Goals\n\nGone",
+		Project:   "proj",
+		TopicKey:  "explore/deleted",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.DeleteObservation(id, false); err != nil {
+		t.Fatal(err)
+	}
+
+	obs, err := s.FindByTopicKey("explore/deleted", "proj", "project")
+	if err != nil {
+		t.Fatalf("FindByTopicKey: %v", err)
+	}
+	if obs != nil {
+		t.Error("soft-deleted observation should not be found by FindByTopicKey")
+	}
+}
+
 func TestUpdateObservation(t *testing.T) {
 	s := newTestStore(t)
 	ensureSession(t, s, "sess", "proj")
@@ -1412,6 +1494,21 @@ func TestSuggestTopicKey(t *testing.T) {
 			name: "config type",
 			typ:  "config", title: "Docker setup", content: "",
 			want: "config/docker-setup",
+		},
+		{
+			name: "explore type",
+			typ:  "explore", title: "User Auth System", content: "",
+			want: "explore/user-auth-system",
+		},
+		{
+			name: "exploration alias",
+			typ:  "exploration", title: "Dark Mode", content: "",
+			want: "explore/dark-mode",
+		},
+		{
+			name: "discuss alias",
+			typ:  "discuss", title: "API Design", content: "",
+			want: "explore/api-design",
 		},
 		{
 			name: "empty title uses content",

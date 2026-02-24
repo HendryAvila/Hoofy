@@ -787,6 +787,42 @@ func (s *Store) GetObservation(id int64) (*Observation, error) {
 	return &o, nil
 }
 
+// FindByTopicKey returns the latest non-deleted observation matching the
+// given topic_key, project, and scope. Returns nil (not an error) when
+// no matching observation exists.
+func (s *Store) FindByTopicKey(topicKey, project, scope string) (*Observation, error) {
+	if topicKey == "" {
+		return nil, nil
+	}
+	scope = normalizeScope(scope)
+	topicKey = normalizeTopicKey(topicKey)
+
+	row := s.db.QueryRow(
+		`SELECT id, session_id, type, title, content, tool_name, project,
+		        scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
+		 FROM observations
+		 WHERE topic_key = ?
+		   AND ifnull(project, '') = ifnull(?, '')
+		   AND scope = ?
+		   AND deleted_at IS NULL
+		 ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
+		 LIMIT 1`,
+		topicKey, nullableString(project), scope,
+	)
+	var o Observation
+	if err := row.Scan(
+		&o.ID, &o.SessionID, &o.Type, &o.Title, &o.Content,
+		&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
+		&o.CreatedAt, &o.UpdatedAt, &o.DeletedAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &o, nil
+}
+
 // UpdateObservation partially updates an observation by ID.
 func (s *Store) UpdateObservation(id int64, p UpdateObservationParams) (*Observation, error) {
 	obs, err := s.GetObservation(id)
@@ -1837,6 +1873,8 @@ func inferTopicFamily(typ, title, content string) string {
 		return "config"
 	case "discovery", "investigation", "root_cause", "root-cause":
 		return "discovery"
+	case "explore", "exploration", "context", "discuss":
+		return "explore"
 	case "learning", "learn":
 		return "learning"
 	case "session_summary":

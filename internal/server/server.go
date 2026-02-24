@@ -135,6 +135,14 @@ func New() (*server.MCPServer, func(), error) {
 		// to memory for cross-session awareness.
 		changeAdvanceTool.SetBridge(bridge)
 		adrTool.SetBridge(bridge)
+
+		// --- Register explore tool (SDD + Memory hybrid) ---
+		//
+		// sdd_explore is a standalone tool that captures pre-pipeline context.
+		// It depends only on memory.Store, not on config or change stores.
+		// Registered here because it requires memory to be available.
+		exploreTool := tools.NewExploreTool(memStore)
+		s.AddTool(exploreTool.Definition(), exploreTool.Handle)
 	}
 
 	// --- Register prompts ---
@@ -244,6 +252,38 @@ You do NOT need to activate Hoofy for:
 
 For bug fixes, refactors, enhancements, and small features, use the
 ADAPTIVE CHANGE PIPELINE instead (see below).
+
+## PRE-PIPELINE EXPLORATION
+
+Before starting any pipeline (project or change), use sdd_explore to capture
+the user's context, goals, and constraints. This ensures every subsequent
+stage is informed by structured pre-work rather than ad-hoc conversation.
+
+### When to Use sdd_explore
+- Before sdd_init_project: Capture project vision, user constraints, tech preferences
+- Before sdd_change: Capture change context, help determine type and size
+- During any open-ended discussion about features, architecture, or direction
+- When the user is "thinking out loud" and you want to preserve their reasoning
+
+### How to Use sdd_explore
+1. Discuss the idea with the user — ask clarifying questions
+2. Call sdd_explore with structured categories:
+   - goals: What they want to achieve
+   - constraints: Limitations (technical, business, time)
+   - preferences: Architecture, tech stack, patterns they prefer
+   - unknowns: Things they're unsure about
+   - decisions: Choices already made
+   - context: Any additional context
+3. The tool saves to memory with topic_key upsert — call it again as context evolves
+4. When ready, start the pipeline — retrieve explore context with mem_search(type=explore)
+   to inform your proposal/spec/design content
+5. The response includes type/size suggestions based on keywords — use these as hints
+
+### Important
+- sdd_explore is OPTIONAL — it never blocks pipeline advancement
+- It uses memory, not the pipeline state machine — no stage gates
+- Call it multiple times as the conversation evolves — it upserts, not duplicates
+- The type/size suggestion is a HINT — the user decides
 
 ## What is SDD?
 Spec-Driven Development reduces AI hallucinations by forcing clear specifications 
