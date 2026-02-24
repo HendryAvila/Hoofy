@@ -36,50 +36,75 @@ One binary. Zero config. Works in **any** MCP-compatible AI tool.
 
 ## Quick Start
 
-### 1. Install
+### 1. Install the binary
+
+<details open>
+<summary><strong>macOS</strong> (Homebrew)</summary>
+
+```bash
+brew install HendryAvila/hoofy/hoofy
+```
+</details>
+
+<details>
+<summary><strong>macOS / Linux</strong> (script)</summary>
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/HendryAvila/Hoofy/main/install.sh | bash
 ```
+</details>
 
 <details>
-<summary>Other methods</summary>
+<summary><strong>Windows</strong> (PowerShell)</summary>
+
+```powershell
+irm https://raw.githubusercontent.com/HendryAvila/Hoofy/main/install.ps1 | iex
+```
+</details>
+
+<details>
+<summary><strong>Go / Source</strong></summary>
 
 ```bash
 # Go install (requires Go 1.25+)
 go install github.com/HendryAvila/Hoofy/cmd/hoofy@latest
 
-# Build from source
+# Or build from source
 git clone https://github.com/HendryAvila/Hoofy.git
 cd Hoofy
 make build
 ```
 </details>
 
-### 2. Add to your AI tool
+### 2. Connect to your AI tool
 
-<details>
-<summary><strong>Claude Code</strong> (recommended: use the plugin)</summary>
+> **MCP Server vs Plugin — what's the difference?**
+>
+> The **MCP server** is Hoofy itself — the binary you just installed. It provides 27 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
+>
+> The **Plugin** is a Claude Code-only enhancement that adds an agent personality, skills, lifecycle hooks, and auto-configures the MCP server for you. It's optional — you get full Hoofy functionality with just the MCP server.
 
-**Option A — Plugin via Marketplace (recommended)**
+<details open>
+<summary><strong>Claude Code</strong></summary>
 
-Inside Claude Code, run:
+**MCP Server** — one command, done:
+
+```bash
+claude mcp add --scope user hoofy hoofy serve
+```
+
+**Plugin** (optional, Claude Code only) — adds agent + skills + hooks on top of the MCP server:
 
 ```
 /plugin marketplace add HendryAvila/hoofy-plugins
 /plugin install hoofy@hoofy-plugins
 ```
+</details>
 
-That's it. You get the Hoofy agent, 3 skills, lifecycle hooks, and MCP auto-configuration.
+<details>
+<summary><strong>Cursor</strong></summary>
 
-**Option B — Plugin from local directory**
-
-```bash
-git clone https://github.com/HendryAvila/hoofy-plugins.git
-claude --plugin-dir ./hoofy-plugins/plugins/hoofy
-```
-
-**Option C — MCP only (manual)**
+Add to your MCP config:
 
 ```json
 {
@@ -96,6 +121,8 @@ claude --plugin-dir ./hoofy-plugins/plugins/hoofy
 <details>
 <summary><strong>VS Code Copilot</strong></summary>
 
+Add to `.vscode/mcp.json`:
+
 ```json
 {
   "servers": {
@@ -110,22 +137,9 @@ claude --plugin-dir ./hoofy-plugins/plugins/hoofy
 </details>
 
 <details>
-<summary><strong>Cursor</strong></summary>
-
-```json
-{
-  "mcpServers": {
-    "hoofy": {
-      "command": "hoofy",
-      "args": ["serve"]
-    }
-  }
-}
-```
-</details>
-
-<details>
 <summary><strong>OpenCode</strong></summary>
+
+Add to `~/.config/opencode/opencode.json` inside the `"mcp"` key:
 
 ```json
 {
@@ -142,6 +156,8 @@ claude --plugin-dir ./hoofy-plugins/plugins/hoofy
 
 <details>
 <summary><strong>Gemini CLI</strong></summary>
+
+Add to your MCP config:
 
 ```json
 {
