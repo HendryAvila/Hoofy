@@ -26,12 +26,12 @@ Hoofy is three systems in one MCP server:
 
 | System | What it does | Tools |
 |---|---|---|
-| **Memory** | Persistent context across sessions — decisions, bugs, patterns, discoveries. Knowledge graph relations connect observations into a navigable web. Your AI remembers what happened yesterday. | 17 `mem_*` tools |
-| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). | 4 `sdd_change*` + `sdd_adr` |
+| **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. Decisions, bugs, patterns, discoveries — with a knowledge graph that connects observations into a navigable web. Your AI remembers what happened yesterday. | 17 `mem_*` tools |
+| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Tasks include optional wave assignments for parallel execution. | 4 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate that blocks hallucinations. | 8 `sdd_*` tools |
 | **Explore** | Pre-pipeline context capture — goals, constraints, preferences, decisions. Saves structured context to memory before you start any pipeline. | `sdd_explore` |
 
-One binary. Zero config. Works in **any** MCP-compatible AI tool. **31 tools total.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **31 tools total.**
 
 ### How it flows
 
@@ -113,7 +113,15 @@ make build
 >
 > The **MCP server** is Hoofy itself — the binary you just installed. It provides 31 tools (memory, change pipeline, project pipeline, explore) and works with **any** MCP-compatible AI tool.
 >
-> The **Plugin** is a Claude Code-only enhancement that adds an agent personality, skills, lifecycle hooks, and auto-configures the MCP server for you. It's optional — you get full Hoofy functionality with just the MCP server.
+> The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
+>
+> | Component | What it does |
+> |---|---|
+> | **Agent** | A custom personality (Hoofy the horse-architect) that teaches through concepts, not code dumps. Enforces SDD discipline — the AI won't skip specs. |
+> | **Skills** | Loadable instruction sets for specific domains (React 19, Next.js 15, TypeScript, Tailwind 4, Django DRF, Playwright, etc.). The agent auto-detects context and loads the right skill before writing code. |
+> | **Hooks** | Lifecycle automation — `PreToolCall` and `PostToolCall` hooks that trigger memory operations automatically (e.g., saving session context, capturing discoveries after tool use). |
+>
+> The plugin is optional — you get full Hoofy functionality with just the MCP server. The plugin just makes the experience smoother in Claude Code.
 
 <details open>
 <summary><strong>Claude Code</strong></summary>
