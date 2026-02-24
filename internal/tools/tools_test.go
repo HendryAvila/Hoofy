@@ -1593,6 +1593,99 @@ func TestTasksTool_Handle_MissingRequiredFields(t *testing.T) {
 	}
 }
 
+func TestTasksTool_Handle_WithWaveAssignments(t *testing.T) {
+	tmpDir, cleanup := setupTestProjectAtStage(t, config.ModeGuided, config.StageTasks)
+	defer cleanup()
+
+	designPath := config.StagePath(tmpDir, config.StageDesign)
+	if err := writeStageFile(designPath, "# Design\n\n## Architecture\nMonolith"); err != nil {
+		t.Fatalf("write design: %v", err)
+	}
+
+	store := config.NewFileStore()
+	renderer, _ := templates.NewRenderer()
+	tool := NewTasksTool(store, renderer)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"total_tasks":      "3",
+		"estimated_effort": "2 days",
+		"tasks":            "### TASK-001: Scaffolding\n**Component**: Setup",
+		"dependency_graph": "TASK-001 → TASK-002 → TASK-003",
+		"wave_assignments": "**Wave 1**:\n- TASK-001\n\n**Wave 2**:\n- TASK-002\n- TASK-003",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	if isErrorResult(result) {
+		t.Fatalf("expected success, got error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Wave section must be present in the rendered output.
+	waveChecks := []string{
+		"Execution Waves",
+		"Wave 1",
+		"Wave 2",
+		"TASK-001",
+		"in parallel",
+	}
+	for _, check := range waveChecks {
+		if !strings.Contains(text, check) {
+			t.Errorf("result should contain %q when wave_assignments provided", check)
+		}
+	}
+}
+
+func TestTasksTool_Handle_WithoutWaveAssignments(t *testing.T) {
+	tmpDir, cleanup := setupTestProjectAtStage(t, config.ModeGuided, config.StageTasks)
+	defer cleanup()
+
+	designPath := config.StagePath(tmpDir, config.StageDesign)
+	if err := writeStageFile(designPath, "# Design\n\n## Architecture\nMonolith"); err != nil {
+		t.Fatalf("write design: %v", err)
+	}
+
+	store := config.NewFileStore()
+	renderer, _ := templates.NewRenderer()
+	tool := NewTasksTool(store, renderer)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"total_tasks":      "3",
+		"estimated_effort": "2 days",
+		"tasks":            "### TASK-001: Scaffolding\n**Component**: Setup",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+
+	if isErrorResult(result) {
+		t.Fatalf("expected success, got error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Wave section must NOT be present when wave_assignments is omitted.
+	if strings.Contains(text, "Execution Waves") {
+		t.Error("result should NOT contain 'Execution Waves' when wave_assignments is omitted")
+	}
+
+	// Other sections must still work (backwards compatibility).
+	if !strings.Contains(text, "Implementation Tasks Created") {
+		t.Error("result should still contain 'Implementation Tasks Created'")
+	}
+	if !strings.Contains(text, "TASK-001") {
+		t.Error("result should still contain task content")
+	}
+}
+
 func TestTasksTool_Handle_WrongStage(t *testing.T) {
 	_, cleanup := setupTestProjectAtStage(t, config.ModeGuided, config.StageDesign)
 	defer cleanup()

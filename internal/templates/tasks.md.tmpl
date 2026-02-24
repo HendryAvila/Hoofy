@@ -16,6 +16,14 @@
 ## Dependency Graph
 
 {{ .DependencyGraph }}
+{{ if .WaveAssignments }}
+
+## Execution Waves
+
+> Tasks within the same wave can execute **in parallel**. Wave N+1 starts only after all tasks in wave N are complete.
+
+{{ .WaveAssignments }}
+{{ end }}
 
 ## Acceptance Criteria
 

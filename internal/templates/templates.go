@@ -69,15 +69,15 @@ type ProposalData struct {
 
 // RequirementsData holds the data for rendering requirements.
 type RequirementsData struct {
-	Name         string
-	MustHave     string
-	ShouldHave   string
-	CouldHave    string
-	WontHave     string
+	Name          string
+	MustHave      string
+	ShouldHave    string
+	CouldHave     string
+	WontHave      string
 	NonFunctional string
-	Constraints  string
-	Assumptions  string
-	Dependencies string
+	Constraints   string
+	Assumptions   string
+	Dependencies  string
 }
 
 // ClarificationsData holds the data for rendering the clarifications log.
@@ -110,5 +110,6 @@ type TasksData struct {
 	EstimatedEffort    string
 	Tasks              string
 	DependencyGraph    string
+	WaveAssignments    string // optional: parallel execution wave groupings
 	AcceptanceCriteria string
 }

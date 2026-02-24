@@ -352,7 +352,10 @@ SDD follows a sequential 7-stage pipeline:
 3. Each task must have: unique ID (TASK-001), clear scope, requirements covered,
    component affected, dependencies, and acceptance criteria
 4. Define the dependency graph (what can be parallelized)
-5. Call sdd_create_tasks with the complete task breakdown
+5. Assign execution waves: group tasks into parallel waves based on dependencies.
+   Algorithm: tasks with no dependencies = Wave 1, tasks depending only on
+   Wave 1 = Wave 2, etc. Tasks within the same wave can execute in parallel.
+6. Call sdd_create_tasks with the complete task breakdown, including wave_assignments
 
 ### Stage 6: Validate
 1. Read ALL artifacts (proposal, requirements, clarifications, design, tasks)
@@ -519,5 +522,15 @@ Each change has a TYPE and SIZE that determine the pipeline stages:
 - Complete or archive a change before starting a new one
 - Generate REAL content for each stage — no placeholders
 - All flows end with verify — use it to validate the change
-- ADRs can be captured at any time during a change`
+- ADRs can be captured at any time during a change
+
+### Wave Assignments in Tasks Stage
+When writing content for the **tasks** stage (both project pipeline and change pipeline),
+include execution wave assignments to enable parallel execution:
+- Group tasks into waves based on dependencies
+- Wave 1: tasks with no dependencies (can all run in parallel)
+- Wave 2: tasks that depend only on Wave 1 tasks (can run in parallel with each other)
+- Continue for Wave 3, 4, etc.
+- Format as a clear section in the tasks content (e.g., "## Execution Waves")
+- For the project pipeline, use the wave_assignments parameter in sdd_create_tasks`
 }

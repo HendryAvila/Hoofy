@@ -193,6 +193,95 @@ func TestRender_EmptyProposalData(t *testing.T) {
 	}
 }
 
+// --- Render: Tasks ---
+
+func TestRender_Tasks_WithWaveAssignments(t *testing.T) {
+	r, err := NewRenderer()
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+
+	data := TasksData{
+		Name:               "Test Project",
+		TotalTasks:         "5",
+		EstimatedEffort:    "3-4 days",
+		Tasks:              "### TASK-001: Scaffolding\n**Component**: Setup",
+		DependencyGraph:    "TASK-001 → TASK-002",
+		WaveAssignments:    "**Wave 1**:\n- TASK-001: Scaffolding\n\n**Wave 2**:\n- TASK-002: API endpoints",
+		AcceptanceCriteria: "- All tests pass",
+	}
+
+	result, err := r.Render(Tasks, data)
+	if err != nil {
+		t.Fatalf("Render(Tasks) failed: %v", err)
+	}
+
+	checks := []string{
+		"# Test Project — Implementation Tasks",
+		"**Total Tasks:** 5",
+		"**Estimated Effort:** 3-4 days",
+		"TASK-001",
+		"TASK-001 → TASK-002",
+		"## Execution Waves",
+		"in parallel",
+		"**Wave 1**",
+		"**Wave 2**",
+		"## Acceptance Criteria",
+		"All tests pass",
+		"SDD-Hoffy",
+	}
+
+	for _, check := range checks {
+		if !strings.Contains(result, check) {
+			t.Errorf("Tasks output missing: %q", check)
+		}
+	}
+}
+
+func TestRender_Tasks_WithoutWaveAssignments(t *testing.T) {
+	r, err := NewRenderer()
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+
+	data := TasksData{
+		Name:               "Test Project",
+		TotalTasks:         "3",
+		EstimatedEffort:    "2 days",
+		Tasks:              "### TASK-001: Scaffolding",
+		DependencyGraph:    "TASK-001 → TASK-002",
+		WaveAssignments:    "", // empty — should NOT render wave section
+		AcceptanceCriteria: "- All tests pass",
+	}
+
+	result, err := r.Render(Tasks, data)
+	if err != nil {
+		t.Fatalf("Render(Tasks) failed: %v", err)
+	}
+
+	// Wave section must NOT be present.
+	if strings.Contains(result, "## Execution Waves") {
+		t.Error("Execution Waves section should NOT render when WaveAssignments is empty")
+	}
+	if strings.Contains(result, "in parallel") {
+		t.Error("wave blockquote should NOT render when WaveAssignments is empty")
+	}
+
+	// Other sections must still be present (backwards compatibility).
+	checks := []string{
+		"# Test Project — Implementation Tasks",
+		"TASK-001",
+		"## Dependency Graph",
+		"## Acceptance Criteria",
+	}
+
+	for _, check := range checks {
+		if !strings.Contains(result, check) {
+			t.Errorf("Tasks output missing: %q", check)
+		}
+	}
+}
+
 // --- Renderer interface compliance ---
 
 func TestEmbedRenderer_ImplementsRenderer(t *testing.T) {

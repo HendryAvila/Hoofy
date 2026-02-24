@@ -73,6 +73,21 @@ func (t *TasksTool) Definition() mcp.Tool {
 				"TASK-001 → TASK-004 (can parallel with TASK-002)\\n"+
 				"TASK-003 + TASK-004 → TASK-005'"),
 		),
+		mcp.WithString("wave_assignments",
+			mcp.Description("Parallel execution wave groupings derived from the dependency graph. "+
+				"Group tasks into waves where all tasks in the same wave can execute in parallel. "+
+				"Wave N+1 starts only after all wave N tasks complete. "+
+				"Algorithm: tasks with no dependencies = Wave 1, tasks depending only on Wave 1 = Wave 2, etc. "+
+				"Use markdown format. "+
+				"Example: '**Wave 1** (parallel — no dependencies):\\n"+
+				"- TASK-001: Project scaffolding\\n"+
+				"- TASK-002: Database schema\\n\\n"+
+				"**Wave 2** (parallel — depends on Wave 1):\\n"+
+				"- TASK-003: API endpoints\\n"+
+				"- TASK-004: Auth module\\n\\n"+
+				"**Wave 3** (sequential — depends on Wave 2):\\n"+
+				"- TASK-005: Integration tests'"),
+		),
 		mcp.WithString("acceptance_criteria",
 			mcp.Description("Global acceptance criteria that apply across ALL tasks. "+
 				"These are the project-wide quality gates. "+
@@ -89,6 +104,7 @@ func (t *TasksTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 	estimatedEffort := req.GetString("estimated_effort", "")
 	tasks := req.GetString("tasks", "")
 	dependencyGraph := req.GetString("dependency_graph", "")
+	waveAssignments := req.GetString("wave_assignments", "")
 	acceptanceCriteria := req.GetString("acceptance_criteria", "")
 
 	// Validate required fields.
@@ -144,6 +160,7 @@ func (t *TasksTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.C
 		EstimatedEffort:    estimatedEffort,
 		Tasks:              tasks,
 		DependencyGraph:    dependencyGraph,
+		WaveAssignments:    waveAssignments,
 		AcceptanceCriteria: acceptanceCriteria,
 	}
 

@@ -44,7 +44,7 @@ Hoofy exposes **31 MCP tools** across four systems. The AI uses them proactively
 | `sdd_generate_requirements` | Save formal requirements with MoSCoW prioritization |
 | `sdd_clarify` | Run the Clarity Gate (8-dimension ambiguity analysis) |
 | `sdd_create_design` | Save technical architecture (components, data model, APIs, security) |
-| `sdd_create_tasks` | Save implementation task breakdown with dependency graph |
+| `sdd_create_tasks` | Save implementation task breakdown with dependency graph and optional wave assignments for parallel execution |
 | `sdd_validate` | Cross-artifact consistency check (requirements ↔ design ↔ tasks) |
 | `sdd_get_context` | View project state, pipeline status, and stage artifacts |
 
