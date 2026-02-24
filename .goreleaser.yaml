@@ -34,6 +34,22 @@ archives:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
 
+brews:
+  - repository:
+      owner: HendryAvila
+      name: homebrew-hoofy
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    name: hoofy
+    homepage: "https://github.com/HendryAvila/Hoofy"
+    description: "Spec-Driven Development MCP Server — persistent memory, adaptive changes, clarity gate"
+    license: "MIT"
+    install: |
+      bin.install "hoofy"
+    test: |
+      system "#{bin}/hoofy", "--version"
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
 checksum:
   name_template: "checksums.txt"
 
