@@ -835,6 +835,320 @@ func TestPassiveCaptureTool_MissingContent(t *testing.T) {
 	mustBeToolError(t, r, err, "content")
 }
 
+// ─── RelateTool ──────────────────────────────────────────────────────────────
+
+func TestRelateTool_Success(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id1 := seedObservation(t, store, "Decision A", "First decision content", "my-app")
+	id2 := seedObservation(t, store, "Decision B", "Second decision content", "my-app")
+
+	tool := NewRelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"from_id":       float64(id1),
+		"to_id":         float64(id2),
+		"relation_type": "depends_on",
+		"note":          "B depends on A",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Relation created") {
+		t.Errorf("expected 'Relation created', got: %s", text)
+	}
+	if !strings.Contains(text, "depends_on") {
+		t.Errorf("expected relation type in response, got: %s", text)
+	}
+	if !strings.Contains(text, "Relation ID:") {
+		t.Errorf("expected relation ID in response, got: %s", text)
+	}
+}
+
+func TestRelateTool_Bidirectional(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id1 := seedObservation(t, store, "Bidir Left", "Left side content", "my-app")
+	id2 := seedObservation(t, store, "Bidir Right", "Right side content", "my-app")
+
+	tool := NewRelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"from_id":       float64(id1),
+		"to_id":         float64(id2),
+		"relation_type": "relates_to",
+		"bidirectional": true,
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Bidirectional") {
+		t.Errorf("expected 'Bidirectional' in response, got: %s", text)
+	}
+	if !strings.Contains(text, "↔") {
+		t.Errorf("expected bidirectional arrow ↔, got: %s", text)
+	}
+}
+
+func TestRelateTool_MissingFromID(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewRelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"to_id":         float64(1),
+		"relation_type": "relates_to",
+	}))
+
+	mustBeToolError(t, r, err, "from_id")
+}
+
+func TestRelateTool_MissingToID(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewRelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"from_id":       float64(1),
+		"relation_type": "relates_to",
+	}))
+
+	mustBeToolError(t, r, err, "to_id")
+}
+
+func TestRelateTool_MissingRelationType(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewRelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"from_id": float64(1),
+		"to_id":   float64(2),
+	}))
+
+	mustBeToolError(t, r, err, "relation_type")
+}
+
+func TestRelateTool_SelfRelationError(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id := seedObservation(t, store, "Self ref", "Self reference content", "my-app")
+
+	tool := NewRelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"from_id":       float64(id),
+		"to_id":         float64(id),
+		"relation_type": "relates_to",
+	}))
+
+	mustBeToolError(t, r, err, "self-relation")
+}
+
+// ─── UnrelateTool ────────────────────────────────────────────────────────────
+
+func TestUnrelateTool_Success(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id1 := seedObservation(t, store, "Unrel A", "Unrelate content A", "my-app")
+	id2 := seedObservation(t, store, "Unrel B", "Unrelate content B", "my-app")
+
+	relIDs, err := store.AddRelation(memory.AddRelationParams{
+		FromID: id1, ToID: id2, Type: "relates_to",
+	})
+	if err != nil {
+		t.Fatalf("seed relation: %v", err)
+	}
+
+	tool := NewUnrelateTool(store)
+
+	r, toolErr := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"id": float64(relIDs[0]),
+	}))
+
+	mustNotError(t, r, toolErr)
+	text := resultText(r)
+
+	if !strings.Contains(text, "removed") {
+		t.Errorf("expected 'removed' in response, got: %s", text)
+	}
+}
+
+func TestUnrelateTool_MissingID(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewUnrelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{}))
+	mustBeToolError(t, r, err, "id")
+}
+
+func TestUnrelateTool_NotFound(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewUnrelateTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"id": float64(99999),
+	}))
+
+	mustBeToolError(t, r, err, "not found")
+}
+
+// ─── BuildContextTool ────────────────────────────────────────────────────────
+
+func TestBuildContextTool_Success(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id1 := seedObservation(t, store, "Root node", "Root context content", "my-app")
+	id2 := seedObservation(t, store, "Child node", "Child context content", "my-app")
+
+	store.AddRelation(memory.AddRelationParams{
+		FromID: id1, ToID: id2, Type: "implements",
+	})
+
+	tool := NewBuildContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(id1),
+		"depth":          float64(2),
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Context Graph") {
+		t.Errorf("expected 'Context Graph' header, got: %s", text)
+	}
+	if !strings.Contains(text, "Root node") {
+		t.Errorf("expected root title, got: %s", text)
+	}
+	if !strings.Contains(text, "Child node") {
+		t.Errorf("expected connected child title, got: %s", text)
+	}
+	if !strings.Contains(text, "implements") {
+		t.Errorf("expected relation type, got: %s", text)
+	}
+}
+
+func TestBuildContextTool_NoRelations(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id := seedObservation(t, store, "Isolated node", "No connections here", "my-app")
+
+	tool := NewBuildContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(id),
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "No relations found") {
+		t.Errorf("expected 'No relations found', got: %s", text)
+	}
+}
+
+func TestBuildContextTool_MissingID(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewBuildContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{}))
+	mustBeToolError(t, r, err, "observation_id")
+}
+
+func TestBuildContextTool_NotFound(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewBuildContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(99999),
+	}))
+
+	mustBeToolError(t, r, err, "not found")
+}
+
+// ─── GetObservationTool with Relations ───────────────────────────────────────
+
+func TestGetObservationTool_ShowsRelations(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id1 := seedObservation(t, store, "Obs with rels", "Content with relations", "my-app")
+	id2 := seedObservation(t, store, "Related obs", "Related content", "my-app")
+
+	store.AddRelation(memory.AddRelationParams{
+		FromID: id1, ToID: id2, Type: "depends_on", Note: "critical dependency",
+	})
+
+	tool := NewGetObservationTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"id": float64(id1),
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "## Relations") {
+		t.Errorf("expected Relations section, got: %s", text)
+	}
+	if !strings.Contains(text, "Outgoing") {
+		t.Errorf("expected Outgoing label, got: %s", text)
+	}
+	if !strings.Contains(text, "depends_on") {
+		t.Errorf("expected relation type, got: %s", text)
+	}
+	if !strings.Contains(text, "critical dependency") {
+		t.Errorf("expected note in output, got: %s", text)
+	}
+}
+
+func TestGetObservationTool_NoRelationsSection(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id := seedObservation(t, store, "No rels obs", "Content without relations", "my-app")
+
+	tool := NewGetObservationTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"id": float64(id),
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Should NOT have a Relations section when there are no relations
+	if strings.Contains(text, "## Relations") {
+		t.Errorf("should not show Relations section when none exist, got: %s", text)
+	}
+}
+
+func TestGetObservationTool_IncomingRelations(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id1 := seedObservation(t, store, "Target obs", "Target content", "my-app")
+	id2 := seedObservation(t, store, "Source obs", "Source content", "my-app")
+
+	// id2 → id1 (incoming from id1's perspective)
+	store.AddRelation(memory.AddRelationParams{
+		FromID: id2, ToID: id1, Type: "caused_by",
+	})
+
+	tool := NewGetObservationTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"id": float64(id1),
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Incoming") {
+		t.Errorf("expected Incoming label, got: %s", text)
+	}
+	if !strings.Contains(text, "caused_by") {
+		t.Errorf("expected relation type, got: %s", text)
+	}
+}
+
 // ─── Definition tests ────────────────────────────────────────────────────────
 
 func TestAllTools_HaveDefinitions(t *testing.T) {
@@ -858,6 +1172,9 @@ func TestAllTools_HaveDefinitions(t *testing.T) {
 		{"mem_update", NewUpdateTool(store).Definition()},
 		{"mem_suggest_topic_key", NewSuggestTopicKeyTool().Definition()},
 		{"mem_capture_passive", NewPassiveCaptureTool(store).Definition()},
+		{"mem_relate", NewRelateTool(store).Definition()},
+		{"mem_unrelate", NewUnrelateTool(store).Definition()},
+		{"mem_build_context", NewBuildContextTool(store).Definition()},
 	}
 
 	for _, tt := range tools {

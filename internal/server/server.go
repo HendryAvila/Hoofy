@@ -157,7 +157,7 @@ func New() (*server.MCPServer, func(), error) {
 // is disabled or hasn't been initialized.
 func noop() {}
 
-// registerMemoryTools registers all 14 memory MCP tools with the server.
+// registerMemoryTools registers all 17 memory MCP tools with the server.
 func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 	// --- Session lifecycle ---
 	sessionStart := memtools.NewSessionStartTool(ms)
@@ -205,6 +205,16 @@ func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 	// --- Statistics ---
 	statsTool := memtools.NewStatsTool(ms)
 	s.AddTool(statsTool.Definition(), statsTool.Handle)
+
+	// --- Knowledge graph (relations) ---
+	relateTool := memtools.NewRelateTool(ms)
+	s.AddTool(relateTool.Definition(), relateTool.Handle)
+
+	unrelateTool := memtools.NewUnrelateTool(ms)
+	s.AddTool(unrelateTool.Definition(), unrelateTool.Handle)
+
+	buildCtx := memtools.NewBuildContextTool(ms)
+	s.AddTool(buildCtx.Definition(), buildCtx.Handle)
 }
 
 // serverInstructions returns the system instructions that tell the AI
@@ -381,6 +391,31 @@ This helps future sessions understand context without the user repeating themsel
 2. Use mem_search for specific topics
 3. Use mem_timeline to see chronological context around a search result
 4. Use mem_get_observation to read the full, untruncated content
+
+### Knowledge Graph (Relations)
+
+Observations can be connected with typed, directional relations to form a knowledge graph.
+This transforms flat memories into a navigable web of connected decisions, patterns, and discoveries.
+
+**Creating relations** — use mem_relate after saving related observations:
+- mem_relate(from_id, to_id, relation_type) — creates a directional edge
+- Common types: relates_to, implements, depends_on, caused_by, supersedes, part_of
+- Use bidirectional=true when the relationship goes both ways
+- Add a note to explain WHY the observations are related
+
+**Traversing the graph** — use mem_build_context to explore connections:
+- mem_build_context(observation_id) — shows connected observations up to depth 2
+- mem_build_context(observation_id, depth=3) — goes deeper for more context
+- Use this when exploring a topic to understand its full web of related decisions
+
+**Removing relations** — use mem_unrelate(id) with the relation ID
+
+**When to create relations**:
+- After a bug fix, relate it to the decision that caused it (caused_by)
+- After implementing a feature, relate tasks to their requirements (implements)
+- When a new decision supersedes an old one (supersedes)
+- When observations are about the same topic (relates_to)
+- When one pattern depends on another (depends_on)
 
 ## ADAPTIVE CHANGE PIPELINE
 

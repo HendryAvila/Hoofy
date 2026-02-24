@@ -1,10 +1,10 @@
 # Tool Reference
 
-Hoofy exposes **27 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
+Hoofy exposes **30 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
 
 ---
 
-## Memory (14 tools)
+## Memory (17 tools)
 
 | Tool | Description |
 |---|---|
@@ -13,7 +13,10 @@ Hoofy exposes **27 MCP tools** across three systems. The AI uses them proactivel
 | `mem_search` | Full-text search across all sessions |
 | `mem_context` | Recent observations for session startup |
 | `mem_timeline` | Chronological context around a specific event |
-| `mem_get_observation` | Full content of a specific observation |
+| `mem_get_observation` | Full content of a specific observation (includes direct relations) |
+| `mem_relate` | Create a typed directional relation between two observations |
+| `mem_unrelate` | Remove a relation by relation ID |
+| `mem_build_context` | Traverse the knowledge graph from a starting observation |
 | `mem_session_start` | Register a new coding session |
 | `mem_session_end` | Close a session with summary |
 | `mem_session_summary` | Save comprehensive end-of-session summary |

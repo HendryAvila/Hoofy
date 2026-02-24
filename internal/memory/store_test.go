@@ -1561,6 +1561,569 @@ func TestSearch_SpecialCharactersSanitized(t *testing.T) {
 	}
 }
 
+// ─── Relations ───────────────────────────────────────────────────────────────
+
+func TestAddRelation_Basic(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Decision A", "Content A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Decision B", "Content B", "proj")
+
+	ids, err := s.AddRelation(memory.AddRelationParams{
+		FromID: id1,
+		ToID:   id2,
+		Type:   "relates_to",
+		Note:   "these are related",
+	})
+	if err != nil {
+		t.Fatalf("AddRelation error: %v", err)
+	}
+	if len(ids) != 1 {
+		t.Fatalf("expected 1 relation ID, got %d", len(ids))
+	}
+	if ids[0] <= 0 {
+		t.Errorf("expected positive relation ID, got %d", ids[0])
+	}
+}
+
+func TestAddRelation_DefaultType(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Obs A", "Content A default type", "proj")
+	id2 := mustAddObs(t, s, "sess", "Obs B", "Content B default type", "proj")
+
+	_, err := s.AddRelation(memory.AddRelationParams{
+		FromID: id1,
+		ToID:   id2,
+		Type:   "", // should default to "relates_to"
+	})
+	if err != nil {
+		t.Fatalf("AddRelation with empty type: %v", err)
+	}
+
+	rels, err := s.GetRelations(id1)
+	if err != nil {
+		t.Fatalf("GetRelations: %v", err)
+	}
+	if len(rels) != 1 {
+		t.Fatalf("expected 1 relation, got %d", len(rels))
+	}
+	if rels[0].Type != "relates_to" {
+		t.Errorf("Type = %q, want %q", rels[0].Type, "relates_to")
+	}
+}
+
+func TestAddRelation_Bidirectional(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Bidir A", "Content A bidir", "proj")
+	id2 := mustAddObs(t, s, "sess", "Bidir B", "Content B bidir", "proj")
+
+	ids, err := s.AddRelation(memory.AddRelationParams{
+		FromID:        id1,
+		ToID:          id2,
+		Type:          "depends_on",
+		Bidirectional: true,
+	})
+	if err != nil {
+		t.Fatalf("AddRelation bidirectional: %v", err)
+	}
+	if len(ids) != 2 {
+		t.Fatalf("expected 2 relation IDs for bidirectional, got %d", len(ids))
+	}
+
+	// Both directions should exist
+	relsA, _ := s.GetRelations(id1)
+	if len(relsA) != 2 {
+		t.Errorf("expected 2 relations from id1 perspective, got %d", len(relsA))
+	}
+
+	relsB, _ := s.GetRelations(id2)
+	if len(relsB) != 2 {
+		t.Errorf("expected 2 relations from id2 perspective, got %d", len(relsB))
+	}
+}
+
+func TestAddRelation_SelfRelationError(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id := mustAddObs(t, s, "sess", "Self ref", "Content self ref", "proj")
+
+	_, err := s.AddRelation(memory.AddRelationParams{
+		FromID: id,
+		ToID:   id,
+		Type:   "relates_to",
+	})
+	if err == nil {
+		t.Error("expected error for self-relation")
+	}
+	if !strings.Contains(err.Error(), "self-relation") {
+		t.Errorf("error = %q, expected to contain 'self-relation'", err.Error())
+	}
+}
+
+func TestAddRelation_DuplicateError(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Dup A", "Content dup A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Dup B", "Content dup B", "proj")
+
+	_, err := s.AddRelation(memory.AddRelationParams{
+		FromID: id1,
+		ToID:   id2,
+		Type:   "relates_to",
+	})
+	if err != nil {
+		t.Fatalf("first AddRelation: %v", err)
+	}
+
+	// Same relation again → should fail
+	_, err = s.AddRelation(memory.AddRelationParams{
+		FromID: id1,
+		ToID:   id2,
+		Type:   "relates_to",
+	})
+	if err == nil {
+		t.Error("expected error for duplicate relation")
+	}
+	if !strings.Contains(err.Error(), "already exists") {
+		t.Errorf("error = %q, expected to contain 'already exists'", err.Error())
+	}
+}
+
+func TestAddRelation_DifferentTypeAllowed(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Multi A", "Content multi A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Multi B", "Content multi B", "proj")
+
+	_, err1 := s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
+	_, err2 := s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "depends_on"})
+	if err1 != nil {
+		t.Fatalf("first type: %v", err1)
+	}
+	if err2 != nil {
+		t.Fatalf("different type should be allowed: %v", err2)
+	}
+
+	rels, _ := s.GetRelations(id1)
+	if len(rels) != 2 {
+		t.Errorf("expected 2 relations (different types), got %d", len(rels))
+	}
+}
+
+func TestAddRelation_NonExistentObservation(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id := mustAddObs(t, s, "sess", "Exists", "Content that exists", "proj")
+
+	_, err := s.AddRelation(memory.AddRelationParams{
+		FromID: id,
+		ToID:   99999,
+		Type:   "relates_to",
+	})
+	if err == nil {
+		t.Error("expected error for non-existent target observation")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %q, expected to contain 'not found'", err.Error())
+	}
+}
+
+func TestAddRelation_SoftDeletedObservation(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Active obs", "Content active", "proj")
+	id2 := mustAddObs(t, s, "sess", "Deleted obs", "Content soft deleted", "proj")
+	_ = s.DeleteObservation(id2, false)
+
+	_, err := s.AddRelation(memory.AddRelationParams{
+		FromID: id1,
+		ToID:   id2,
+		Type:   "relates_to",
+	})
+	if err == nil {
+		t.Error("expected error when relating to soft-deleted observation")
+	}
+}
+
+func TestRemoveRelation_Basic(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Rem A", "Content rem A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Rem B", "Content rem B", "proj")
+
+	ids, _ := s.AddRelation(memory.AddRelationParams{
+		FromID: id1, ToID: id2, Type: "relates_to",
+	})
+
+	err := s.RemoveRelation(ids[0])
+	if err != nil {
+		t.Fatalf("RemoveRelation: %v", err)
+	}
+
+	// Verify it's gone
+	rels, _ := s.GetRelations(id1)
+	if len(rels) != 0 {
+		t.Errorf("expected 0 relations after removal, got %d", len(rels))
+	}
+}
+
+func TestRemoveRelation_NotFound(t *testing.T) {
+	s := newTestStore(t)
+
+	err := s.RemoveRelation(99999)
+	if err == nil {
+		t.Error("expected error for non-existent relation")
+	}
+	if !strings.Contains(err.Error(), "not found") {
+		t.Errorf("error = %q, expected to contain 'not found'", err.Error())
+	}
+}
+
+func TestGetRelations_Bidirectional(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Get A", "Content get A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Get B", "Content get B", "proj")
+	id3 := mustAddObs(t, s, "sess", "Get C", "Content get C", "proj")
+
+	// id1 → id2, id3 → id1
+	s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
+	s.AddRelation(memory.AddRelationParams{FromID: id3, ToID: id1, Type: "caused_by"})
+
+	rels, err := s.GetRelations(id1)
+	if err != nil {
+		t.Fatalf("GetRelations: %v", err)
+	}
+	if len(rels) != 2 {
+		t.Fatalf("expected 2 relations (outgoing + incoming), got %d", len(rels))
+	}
+
+	// Check both directions present
+	var hasOutgoing, hasIncoming bool
+	for _, r := range rels {
+		if r.FromID == id1 && r.ToID == id2 {
+			hasOutgoing = true
+		}
+		if r.FromID == id3 && r.ToID == id1 {
+			hasIncoming = true
+		}
+	}
+	if !hasOutgoing {
+		t.Error("missing outgoing relation id1 → id2")
+	}
+	if !hasIncoming {
+		t.Error("missing incoming relation id3 → id1")
+	}
+}
+
+func TestGetRelations_Empty(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id := mustAddObs(t, s, "sess", "Lonely", "No relations here", "proj")
+
+	rels, err := s.GetRelations(id)
+	if err != nil {
+		t.Fatalf("GetRelations: %v", err)
+	}
+	if len(rels) != 0 {
+		t.Errorf("expected 0 relations for unrelated obs, got %d", len(rels))
+	}
+}
+
+func TestRelations_HardDeleteCascade(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Cascade A", "Content cascade A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Cascade B", "Content cascade B", "proj")
+
+	s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
+
+	// Hard-delete id2 → relation should CASCADE delete
+	_ = s.DeleteObservation(id2, true)
+
+	rels, _ := s.GetRelations(id1)
+	if len(rels) != 0 {
+		t.Errorf("expected 0 relations after CASCADE delete, got %d", len(rels))
+	}
+}
+
+func TestRelations_SoftDeleteNoEffect(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id1 := mustAddObs(t, s, "sess", "Soft A", "Content soft A", "proj")
+	id2 := mustAddObs(t, s, "sess", "Soft B", "Content soft B", "proj")
+
+	s.AddRelation(memory.AddRelationParams{FromID: id1, ToID: id2, Type: "relates_to"})
+
+	// Soft-delete id2 → relation should REMAIN (soft-delete only sets deleted_at, no row deletion)
+	_ = s.DeleteObservation(id2, false)
+
+	rels, _ := s.GetRelations(id1)
+	if len(rels) != 1 {
+		t.Errorf("expected 1 relation after soft-delete (no cascade), got %d", len(rels))
+	}
+}
+
+func TestBuildContext_Depth1(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	root := mustAddObs(t, s, "sess", "Root", "Root observation content", "proj")
+	child := mustAddObs(t, s, "sess", "Child", "Child observation content", "proj")
+	_ = child
+
+	s.AddRelation(memory.AddRelationParams{FromID: root, ToID: child, Type: "relates_to"})
+
+	result, err := s.BuildContext(root, 1)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	if result.Root.ID != root {
+		t.Errorf("Root.ID = %d, want %d", result.Root.ID, root)
+	}
+	if result.TotalNodes != 1 {
+		t.Errorf("TotalNodes = %d, want 1", result.TotalNodes)
+	}
+	if result.MaxDepth != 1 {
+		t.Errorf("MaxDepth = %d, want 1", result.MaxDepth)
+	}
+	if len(result.Connected) != 1 {
+		t.Fatalf("Connected: len = %d, want 1", len(result.Connected))
+	}
+	if result.Connected[0].Title != "Child" {
+		t.Errorf("Connected[0].Title = %q, want %q", result.Connected[0].Title, "Child")
+	}
+	if result.Connected[0].Direction != "outgoing" {
+		t.Errorf("Direction = %q, want %q", result.Connected[0].Direction, "outgoing")
+	}
+	if result.Connected[0].Depth != 1 {
+		t.Errorf("Depth = %d, want 1", result.Connected[0].Depth)
+	}
+}
+
+func TestBuildContext_Depth2Chain(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	a := mustAddObs(t, s, "sess", "Node A", "Content node A chain", "proj")
+	b := mustAddObs(t, s, "sess", "Node B", "Content node B chain", "proj")
+	c := mustAddObs(t, s, "sess", "Node C", "Content node C chain", "proj")
+
+	// A → B → C
+	s.AddRelation(memory.AddRelationParams{FromID: a, ToID: b, Type: "depends_on"})
+	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: c, Type: "implements"})
+
+	result, err := s.BuildContext(a, 2)
+	if err != nil {
+		t.Fatalf("BuildContext depth 2: %v", err)
+	}
+
+	if result.TotalNodes != 2 {
+		t.Errorf("TotalNodes = %d, want 2 (B and C)", result.TotalNodes)
+	}
+	if result.MaxDepth != 2 {
+		t.Errorf("MaxDepth = %d, want 2", result.MaxDepth)
+	}
+
+	// Verify depth assignments
+	depths := map[string]int{}
+	for _, n := range result.Connected {
+		depths[n.Title] = n.Depth
+	}
+	if depths["Node B"] != 1 {
+		t.Errorf("Node B depth = %d, want 1", depths["Node B"])
+	}
+	if depths["Node C"] != 2 {
+		t.Errorf("Node C depth = %d, want 2", depths["Node C"])
+	}
+}
+
+func TestBuildContext_Depth1DoesNotReachDepth2(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	a := mustAddObs(t, s, "sess", "Limit A", "Content limit A", "proj")
+	b := mustAddObs(t, s, "sess", "Limit B", "Content limit B", "proj")
+	c := mustAddObs(t, s, "sess", "Limit C", "Content limit C", "proj")
+
+	s.AddRelation(memory.AddRelationParams{FromID: a, ToID: b, Type: "relates_to"})
+	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: c, Type: "relates_to"})
+
+	result, err := s.BuildContext(a, 1)
+	if err != nil {
+		t.Fatalf("BuildContext depth 1: %v", err)
+	}
+
+	if result.TotalNodes != 1 {
+		t.Errorf("TotalNodes = %d, want 1 (only B, not C)", result.TotalNodes)
+	}
+}
+
+func TestBuildContext_CycleDetection(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	a := mustAddObs(t, s, "sess", "Cycle A", "Content cycle A", "proj")
+	b := mustAddObs(t, s, "sess", "Cycle B", "Content cycle B", "proj")
+	c := mustAddObs(t, s, "sess", "Cycle C", "Content cycle C", "proj")
+
+	// A → B → C → A (cycle)
+	s.AddRelation(memory.AddRelationParams{FromID: a, ToID: b, Type: "relates_to"})
+	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: c, Type: "relates_to"})
+	s.AddRelation(memory.AddRelationParams{FromID: c, ToID: a, Type: "relates_to"})
+
+	result, err := s.BuildContext(a, 5)
+	if err != nil {
+		t.Fatalf("BuildContext with cycle: %v", err)
+	}
+
+	// Should visit B and C but NOT revisit A
+	if result.TotalNodes != 2 {
+		t.Errorf("TotalNodes = %d, want 2 (B and C, A already visited)", result.TotalNodes)
+	}
+
+	// No node should appear twice
+	seen := map[int64]bool{}
+	for _, n := range result.Connected {
+		if seen[n.ID] {
+			t.Errorf("node %d appeared twice — cycle detection failed", n.ID)
+		}
+		seen[n.ID] = true
+	}
+}
+
+func TestBuildContext_DepthClamping(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	root := mustAddObs(t, s, "sess", "Clamp root", "Content clamp root", "proj")
+
+	// Depth 0 → default to 2
+	result, err := s.BuildContext(root, 0)
+	if err != nil {
+		t.Fatalf("BuildContext depth 0: %v", err)
+	}
+	_ = result // no panic means depth was clamped
+
+	// Depth 10 → clamped to 5
+	result2, err := s.BuildContext(root, 10)
+	if err != nil {
+		t.Fatalf("BuildContext depth 10: %v", err)
+	}
+	_ = result2 // no panic means depth was clamped
+}
+
+func TestBuildContext_NoRelations(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	root := mustAddObs(t, s, "sess", "Isolated", "No relations isolation test", "proj")
+
+	result, err := s.BuildContext(root, 2)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	if result.TotalNodes != 0 {
+		t.Errorf("TotalNodes = %d, want 0 for isolated node", result.TotalNodes)
+	}
+	if len(result.Connected) != 0 {
+		t.Errorf("Connected: len = %d, want 0", len(result.Connected))
+	}
+	if result.MaxDepth != 0 {
+		t.Errorf("MaxDepth = %d, want 0 for no connections", result.MaxDepth)
+	}
+}
+
+func TestBuildContext_NotFound(t *testing.T) {
+	s := newTestStore(t)
+
+	_, err := s.BuildContext(99999, 2)
+	if err == nil {
+		t.Error("expected error for non-existent root observation")
+	}
+}
+
+func TestBuildContext_IncomingRelations(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	a := mustAddObs(t, s, "sess", "Target", "Content target incoming", "proj")
+	b := mustAddObs(t, s, "sess", "Source", "Content source incoming", "proj")
+
+	// B → A (from A's perspective, this is incoming)
+	s.AddRelation(memory.AddRelationParams{FromID: b, ToID: a, Type: "caused_by"})
+
+	result, err := s.BuildContext(a, 1)
+	if err != nil {
+		t.Fatalf("BuildContext: %v", err)
+	}
+
+	if result.TotalNodes != 1 {
+		t.Fatalf("TotalNodes = %d, want 1", result.TotalNodes)
+	}
+	if result.Connected[0].Direction != "incoming" {
+		t.Errorf("Direction = %q, want %q", result.Connected[0].Direction, "incoming")
+	}
+}
+
+func TestMigration_RelationsTableIdempotent(t *testing.T) {
+	dir := t.TempDir()
+	cfg := memory.Config{
+		DataDir:              dir,
+		MaxObservationLength: 2000,
+		MaxContextResults:    20,
+		MaxSearchResults:     20,
+		DedupeWindow:         15 * time.Minute,
+	}
+
+	// Open/close twice → CREATE TABLE IF NOT EXISTS should not fail
+	s1, err := memory.New(cfg)
+	if err != nil {
+		t.Fatalf("first open: %v", err)
+	}
+	_ = s1.Close()
+
+	s2, err := memory.New(cfg)
+	if err != nil {
+		t.Fatalf("second open (idempotent migration): %v", err)
+	}
+	_ = s2.Close()
+}
+
+// mustAddObs is a test helper that creates an observation and returns its ID.
+func mustAddObs(t *testing.T, s *memory.Store, sessID, title, content, project string) int64 {
+	t.Helper()
+	id, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: sessID,
+		Type:      "manual",
+		Title:     title,
+		Content:   content,
+		Project:   project,
+		Scope:     "project",
+	})
+	if err != nil {
+		t.Fatalf("mustAddObs(%q): %v", title, err)
+	}
+	return id
+}
+
 func TestExtractLearnings_MarkdownStripped(t *testing.T) {
 	text := `## Key Learnings:
 1. Always use **bold** and *italic* and ` + "`code`" + ` formatting that should be stripped cleanly from learnings

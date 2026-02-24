@@ -60,6 +60,46 @@ type SearchResult struct {
 	Rank float64 `json:"rank"`
 }
 
+// Relation represents a typed directional edge between two observations.
+type Relation struct {
+	ID        int64  `json:"id"`
+	FromID    int64  `json:"from_id"`
+	ToID      int64  `json:"to_id"`
+	Type      string `json:"type"`
+	Note      string `json:"note,omitempty"`
+	CreatedAt string `json:"created_at"`
+}
+
+// AddRelationParams holds input for creating a new relation.
+type AddRelationParams struct {
+	FromID        int64  `json:"from_id"`
+	ToID          int64  `json:"to_id"`
+	Type          string `json:"type"`
+	Note          string `json:"note,omitempty"`
+	Bidirectional bool   `json:"bidirectional,omitempty"`
+}
+
+// ContextNode represents one node in a graph traversal result.
+type ContextNode struct {
+	ID           int64  `json:"id"`
+	Title        string `json:"title"`
+	Type         string `json:"type"`
+	Project      string `json:"project,omitempty"`
+	CreatedAt    string `json:"created_at"`
+	RelationType string `json:"relation_type"`
+	Direction    string `json:"direction"` // "outgoing" or "incoming"
+	Note         string `json:"note,omitempty"`
+	Depth        int    `json:"depth"`
+}
+
+// ContextResult holds the full graph traversal output.
+type ContextResult struct {
+	Root       Observation   `json:"root"`
+	Connected  []ContextNode `json:"connected"`
+	TotalNodes int           `json:"total_nodes"`
+	MaxDepth   int           `json:"max_depth"`
+}
+
 // SessionSummary is a compact view of a session with observation count.
 type SessionSummary struct {
 	ID               string  `json:"id"`
@@ -433,6 +473,29 @@ func (s *Store) migrate() error {
 		return err
 	}
 
+	// Relations table — knowledge graph edges between observations.
+	// Uses CREATE TABLE/INDEX IF NOT EXISTS for non-destructive migration:
+	// existing databases gain the table on upgrade without data loss.
+	if _, err := s.execHook(s.db, `
+		CREATE TABLE IF NOT EXISTS relations (
+			id         INTEGER PRIMARY KEY AUTOINCREMENT,
+			from_id    INTEGER NOT NULL,
+			to_id      INTEGER NOT NULL,
+			type       TEXT    NOT NULL DEFAULT 'relates_to',
+			note       TEXT,
+			created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+			FOREIGN KEY (from_id) REFERENCES observations(id) ON DELETE CASCADE,
+			FOREIGN KEY (to_id)   REFERENCES observations(id) ON DELETE CASCADE
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_rel_from   ON relations(from_id);
+		CREATE INDEX IF NOT EXISTS idx_rel_to     ON relations(to_id);
+		CREATE INDEX IF NOT EXISTS idx_rel_type   ON relations(type);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_rel_unique ON relations(from_id, to_id, type);
+	`); err != nil {
+		return err
+	}
+
 	// Normalize existing data
 	_, _ = s.execHook(s.db, `UPDATE observations SET scope = 'project' WHERE scope IS NULL OR scope = ''`)                      // best-effort migration cleanup
 	_, _ = s.execHook(s.db, `UPDATE observations SET topic_key = NULL WHERE topic_key = ''`)                                    // best-effort migration cleanup
@@ -802,6 +865,232 @@ func (s *Store) DeleteObservation(id int64, hardDelete bool) error {
 		id,
 	)
 	return err
+}
+
+// ─── Relations ───────────────────────────────────────────────────────────────
+
+// AddRelation creates a typed directional edge between two observations.
+// If Bidirectional is true, both directions are created atomically.
+// Returns the IDs of created relations (1 or 2).
+func (s *Store) AddRelation(p AddRelationParams) ([]int64, error) {
+	// Validate: no self-relations
+	if p.FromID == p.ToID {
+		return nil, fmt.Errorf("cannot create self-relation: from_id and to_id are both %d", p.FromID)
+	}
+
+	// Default relation type
+	if p.Type == "" {
+		p.Type = "relates_to"
+	}
+
+	// Validate both observations exist and are not soft-deleted
+	for _, id := range []int64{p.FromID, p.ToID} {
+		row, err := s.queryItHook(s.db,
+			`SELECT 1 FROM observations WHERE id = ? AND deleted_at IS NULL`, id)
+		if err != nil {
+			return nil, fmt.Errorf("checking observation %d: %w", id, err)
+		}
+		found := row.Next()
+		row.Close()
+		if !found {
+			return nil, fmt.Errorf("observation %d not found or is deleted", id)
+		}
+	}
+
+	note := nullableString(p.Note)
+
+	if !p.Bidirectional {
+		// Single direction
+		res, err := s.execHook(s.db,
+			`INSERT INTO relations (from_id, to_id, type, note) VALUES (?, ?, ?, ?)`,
+			p.FromID, p.ToID, p.Type, note,
+		)
+		if err != nil {
+			if isUniqueViolation(err) {
+				return nil, fmt.Errorf("relation already exists: %d → %d (%s)", p.FromID, p.ToID, p.Type)
+			}
+			return nil, fmt.Errorf("creating relation: %w", err)
+		}
+		id, _ := res.LastInsertId()
+		return []int64{id}, nil
+	}
+
+	// Bidirectional: create both directions in a transaction
+	tx, err := s.beginTxHook()
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	res1, err := s.execHook(tx,
+		`INSERT INTO relations (from_id, to_id, type, note) VALUES (?, ?, ?, ?)`,
+		p.FromID, p.ToID, p.Type, note,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, fmt.Errorf("relation already exists: %d → %d (%s)", p.FromID, p.ToID, p.Type)
+		}
+		return nil, fmt.Errorf("creating forward relation: %w", err)
+	}
+
+	res2, err := s.execHook(tx,
+		`INSERT INTO relations (from_id, to_id, type, note) VALUES (?, ?, ?, ?)`,
+		p.ToID, p.FromID, p.Type, note,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, fmt.Errorf("reverse relation already exists: %d → %d (%s)", p.ToID, p.FromID, p.Type)
+		}
+		return nil, fmt.Errorf("creating reverse relation: %w", err)
+	}
+
+	if err := s.commitHook(tx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	id1, _ := res1.LastInsertId()
+	id2, _ := res2.LastInsertId()
+	return []int64{id1, id2}, nil
+}
+
+// RemoveRelation hard-deletes a relation by its ID.
+func (s *Store) RemoveRelation(id int64) error {
+	res, err := s.execHook(s.db, `DELETE FROM relations WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("deleting relation: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("relation %d not found", id)
+	}
+	return nil
+}
+
+// GetRelations returns all relations where the observation is either source or target.
+func (s *Store) GetRelations(observationID int64) ([]Relation, error) {
+	rows, err := s.queryHook(s.db,
+		`SELECT id, from_id, to_id, type, COALESCE(note, ''), created_at
+		 FROM relations
+		 WHERE from_id = ? OR to_id = ?
+		 ORDER BY created_at ASC`,
+		observationID, observationID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying relations: %w", err)
+	}
+	defer rows.Close()
+
+	var result []Relation
+	for rows.Next() {
+		var r Relation
+		if err := rows.Scan(&r.ID, &r.FromID, &r.ToID, &r.Type, &r.Note, &r.CreatedAt); err != nil {
+			return nil, fmt.Errorf("scanning relation: %w", err)
+		}
+		result = append(result, r)
+	}
+	return result, rows.Err()
+}
+
+// BuildContext traverses the relation graph from a starting observation using BFS.
+// It returns a compact context tree with observation metadata (no full content).
+// Default depth is 2, max is 5. Cycle detection prevents infinite loops.
+func (s *Store) BuildContext(observationID int64, maxDepth int) (*ContextResult, error) {
+	// Clamp depth
+	if maxDepth <= 0 {
+		maxDepth = 2
+	}
+	if maxDepth > 5 {
+		maxDepth = 5
+	}
+
+	// Get root observation
+	root, err := s.GetObservation(observationID)
+	if err != nil {
+		return nil, fmt.Errorf("root observation %d not found: %w", observationID, err)
+	}
+
+	// BFS traversal
+	type queueItem struct {
+		id    int64
+		depth int
+	}
+
+	visited := map[int64]bool{observationID: true}
+	queue := []queueItem{{id: observationID, depth: 0}}
+	var connected []ContextNode
+	actualMaxDepth := 0
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+
+		if current.depth >= maxDepth {
+			continue
+		}
+
+		// Get all relations for this node
+		rels, err := s.GetRelations(current.id)
+		if err != nil {
+			return nil, fmt.Errorf("getting relations for %d: %w", current.id, err)
+		}
+
+		for _, rel := range rels {
+			// Determine the other side and direction
+			otherID := rel.ToID
+			direction := "outgoing"
+			if rel.ToID == current.id {
+				otherID = rel.FromID
+				direction = "incoming"
+			}
+
+			if visited[otherID] {
+				continue
+			}
+			visited[otherID] = true
+
+			// Get lightweight metadata for the connected observation
+			row, err := s.queryItHook(s.db,
+				`SELECT id, title, type, COALESCE(project, ''), created_at
+				 FROM observations WHERE id = ?`, otherID)
+			if err != nil {
+				continue // skip if observation was hard-deleted between queries
+			}
+
+			if !row.Next() {
+				row.Close()
+				continue // skip if observation was hard-deleted between queries
+			}
+
+			var node ContextNode
+			if err := row.Scan(&node.ID, &node.Title, &node.Type, &node.Project, &node.CreatedAt); err != nil {
+				row.Close()
+				continue // skip if scan fails
+			}
+			row.Close()
+
+			nodeDepth := current.depth + 1
+			node.RelationType = rel.Type
+			node.Direction = direction
+			node.Note = rel.Note
+			node.Depth = nodeDepth
+
+			connected = append(connected, node)
+
+			if nodeDepth > actualMaxDepth {
+				actualMaxDepth = nodeDepth
+			}
+
+			// Enqueue for further traversal
+			queue = append(queue, queueItem{id: otherID, depth: nodeDepth})
+		}
+	}
+
+	return &ContextResult{
+		Root:       *root,
+		Connected:  connected,
+		TotalNodes: len(connected),
+		MaxDepth:   actualMaxDepth,
+	}, nil
 }
 
 // ─── User Prompts ────────────────────────────────────────────────────────────
@@ -1668,6 +1957,11 @@ func sanitizeFTS(query string) string {
 		words[i] = `"` + w + `"`
 	}
 	return strings.Join(words, " ")
+}
+
+// isUniqueViolation checks if an error is a SQLite UNIQUE constraint violation.
+func isUniqueViolation(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // ClassifyTool returns the observation type for a given tool name.

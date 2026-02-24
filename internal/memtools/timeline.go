@@ -150,5 +150,43 @@ func (t *GetObservationTool) Handle(ctx context.Context, req mcp.CallToolRequest
 	fmt.Fprintf(&b, "**Duplicates:** %d\n\n", obs.DuplicateCount)
 	fmt.Fprintf(&b, "## Content\n\n%s\n", obs.Content)
 
+	// Append direct relations if any exist
+	rels, relErr := t.store.GetRelations(obs.ID)
+	if relErr == nil && len(rels) > 0 {
+		var outgoing, incoming []string
+		for _, r := range rels {
+			if r.FromID == obs.ID {
+				label := fmt.Sprintf("- → #%d (%s)", r.ToID, r.Type)
+				if r.Note != "" {
+					label += fmt.Sprintf(" — %s", r.Note)
+				}
+				outgoing = append(outgoing, label)
+			} else {
+				label := fmt.Sprintf("- ← #%d (%s)", r.FromID, r.Type)
+				if r.Note != "" {
+					label += fmt.Sprintf(" — %s", r.Note)
+				}
+				incoming = append(incoming, label)
+			}
+		}
+
+		b.WriteString("\n## Relations\n\n")
+		if len(outgoing) > 0 {
+			b.WriteString("**Outgoing:**\n")
+			for _, o := range outgoing {
+				b.WriteString(o + "\n")
+			}
+		}
+		if len(incoming) > 0 {
+			if len(outgoing) > 0 {
+				b.WriteString("\n")
+			}
+			b.WriteString("**Incoming:**\n")
+			for _, i := range incoming {
+				b.WriteString(i + "\n")
+			}
+		}
+	}
+
 	return mcp.NewToolResultText(b.String()), nil
 }
