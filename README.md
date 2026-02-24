@@ -32,6 +32,36 @@ Hoofy is three systems in one MCP server:
 
 One binary. Zero config. Works in **any** MCP-compatible AI tool.
 
+### How it flows
+
+```mermaid
+flowchart TB
+    subgraph project ["New Project (greenfield)"]
+        direction LR
+        P1[Init] --> P2[Propose] --> P3[Requirements] --> P4{Clarity Gate}
+        P4 -->|Ambiguous| P3
+        P4 -->|Clear| P5[Design] --> P6[Tasks] --> P7[Validate]
+    end
+
+    subgraph change ["Existing Project (changes)"]
+        direction LR
+        C1["sdd_change\n(type × size)"] --> C2["Opening Stage\n(describe/propose/scope)"]
+        C2 --> C3["Spec + Design\n(if needed)"]
+        C3 --> C4[Tasks] --> C5[Verify]
+    end
+
+    subgraph memory ["Memory (always active)"]
+        direction LR
+        M1[Session Start] --> M2["Work + Save Discoveries"] --> M3[Session Summary]
+    end
+
+    style P4 fill:#f59e0b,stroke:#d97706,color:#000
+    style P7 fill:#10b981,stroke:#059669,color:#fff
+    style C5 fill:#10b981,stroke:#059669,color:#fff
+```
+
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (27 tools)](docs/tool-reference.md)**
+
 ---
 
 ## Quick Start
@@ -261,169 +291,54 @@ Do NOT start coding without specs for any non-trivial change.
 
 ---
 
-## Memory System
+## Best Practices
 
-Hoofy gives your AI **persistent memory** across sessions using SQLite + FTS5 full-text search. No more re-explaining context every time you start a conversation.
+### 1. Specs before code — always
 
-### What gets remembered
+The AI will try to jump straight to coding. Don't let it. For any non-trivial work:
+- **New project?** → `sdd_init_project` and walk through the full pipeline
+- **New feature?** → `sdd_change(type: "feature", size: "medium")` at minimum
+- **Bug fix?** → Even `sdd_change(type: "fix", size: "small")` gives you describe → tasks → verify
 
-- **Decisions** — Why you chose PostgreSQL over MongoDB
-- **Bug fixes** — What was wrong, why, how you fixed it
-- **Patterns** — Conventions established in the codebase
-- **Discoveries** — Gotchas, edge cases, non-obvious learnings
-- **Session summaries** — What happened in each coding session
+The three cheapest stages (describe + tasks + verify) take under 2 minutes and save hours of debugging hallucinated code.
 
-### How it works
+### 2. Right-size your changes
 
-Memory is structured around **observations** with types (`decision`, `architecture`, `bugfix`, `pattern`, `discovery`, `config`), **topic keys** for upserts (evolving knowledge overwrites, not duplicates), and **sessions** for temporal context.
+Don't use a large pipeline for a one-line fix. Don't use a small pipeline for a new authentication system.
 
-```
-mem_save → Store an observation with structured content
-mem_search → Full-text search across all sessions
-mem_context → Recent context for session startup
-mem_timeline → Chronological drill-down around a specific event
-mem_session_start/end/summary → Session lifecycle management
-```
-
-The AI uses these proactively — saving important findings after completing work, searching past context when starting new tasks, and building session summaries when wrapping up.
-
----
-
-## Change Pipeline
-
-For ongoing development, Hoofy adapts the number of stages to what you're actually doing. A small bug fix doesn't need the same ceremony as a large feature.
-
-### Adaptive flows
-
-```
-                    Small           Medium              Large
-                    ─────           ──────              ─────
-Fix             describe→tasks    describe→spec       describe→spec→design
-                  →verify          →tasks→verify        →tasks→verify
-
-Feature         describe→tasks    propose→spec        propose→spec→clarify
-                  →verify          →tasks→verify        →design→tasks→verify
-
-Refactor        scope→tasks       scope→design        scope→spec→design
-                  →verify          →tasks→verify        →tasks→verify
-
-Enhancement     describe→tasks    propose→spec        propose→spec→clarify
-                  →verify          →tasks→verify        →design→tasks→verify
-```
-
-**12 flow variants**, all deterministic. One active change at a time to prevent scope creep.
-
-### ADRs (Architecture Decision Records)
-
-First-class concept. Record decisions at any point with full lifecycle management (`proposed` → `accepted` → `deprecated` / `rejected`):
-
-```
-sdd_adr(title: "PostgreSQL over MongoDB", status: "accepted",
-        context: "Need ACID for financial data",
-        decision: "Use PostgreSQL 16",
-        consequences: "Need migration tooling")
-```
-
-### Change artifacts
-
-```
-sdd/changes/
-└── fix-login-timeout/
-    ├── manifest.json       # Metadata (type, size, status, stages)
-    ├── describe.md         # What's the problem/feature?
-    ├── spec.md             # Requirements (medium+ changes)
-    ├── design.md           # Technical approach (large changes)
-    ├── tasks.md            # Implementation breakdown
-    └── verify.md           # Verification checklist
-```
-
----
-
-## Project Pipeline
-
-For greenfield projects, Hoofy runs a full 7-stage specification process:
-
-```
-Vague Idea → Proposal → Requirements → Clarity Gate → Architecture → Tasks → Validation
-```
-
-The **Clarity Gate** is the core innovation. It analyzes requirements across 8 dimensions (target users, core functionality, data model, integrations, edge cases, security, scale, scope boundaries) and **blocks progress** until ambiguities are resolved. The AI can't skip ahead to architecture until specs are clear enough.
-
-- **Guided mode** (70/100 threshold) — Step-by-step with examples, for non-technical users
-- **Expert mode** (50/100 threshold) — Streamlined for experienced developers
-
-After the gate: technical design with ADRs → atomic task breakdown with dependency graphs → cross-artifact validation that catches inconsistencies before any code is written.
-
----
-
-## Available Tools
-
-### Memory (14 tools)
-
-| Tool | Description |
+| If the change... | It's probably... |
 |---|---|
-| `mem_save` | Save an observation (decision, bugfix, pattern, etc.) |
-| `mem_save_prompt` | Record user intent for future context |
-| `mem_search` | Full-text search across all sessions |
-| `mem_context` | Recent observations for session startup |
-| `mem_timeline` | Chronological context around a specific event |
-| `mem_get_observation` | Full content of a specific observation |
-| `mem_session_start` | Register a new coding session |
-| `mem_session_end` | Close a session with summary |
-| `mem_session_summary` | Save comprehensive end-of-session summary |
-| `mem_stats` | Memory system statistics |
-| `mem_capture_passive` | Passive observation capture |
-| `mem_delete` | Remove an observation |
-| `mem_update` | Update an existing observation |
-| `mem_suggest_topic_key` | Suggest stable key for upserts |
+| Touches 1-2 files, clear fix | **small** (3 stages) |
+| Needs requirements or design thought | **medium** (4 stages) |
+| Affects architecture, multiple systems | **large** (5-6 stages) |
 
-### Change Pipeline (5 tools)
+### 3. Let memory work for you
 
-| Tool | Description |
-|---|---|
-| `sdd_change` | Create a new change (feature, fix, refactor, enhancement) with size |
-| `sdd_change_advance` | Save stage content and advance to next stage |
-| `sdd_change_status` | View current change status and artifacts |
-| `sdd_adr` | Create or update Architecture Decision Records |
+You don't need to tell the AI to use memory — Hoofy's built-in instructions handle it. But you'll get better results if you:
+- **Start sessions by greeting the AI** — it triggers `mem_context` to load recent history
+- **Mention past decisions** — "remember when we chose SQLite?" triggers `mem_search`
+- **Confirm session summaries** — the AI writes them at session end, review them for accuracy
 
-### Project Pipeline (8 tools)
+### 4. Use topic keys for evolving knowledge
 
-| Tool | Description |
-|---|---|
-| `sdd_init_project` | Initialize project structure |
-| `sdd_create_proposal` | Save structured proposal |
-| `sdd_generate_requirements` | Save formal requirements (MoSCoW) |
-| `sdd_clarify` | Run the Clarity Gate |
-| `sdd_create_design` | Save technical architecture |
-| `sdd_create_tasks` | Save implementation task breakdown |
-| `sdd_validate` | Cross-artifact consistency check |
-| `sdd_get_context` | View project state and artifacts |
+When a decision might change (database schema, API design, architecture), use `topic_key` in `mem_save`. This **updates** the existing observation instead of creating duplicates. One observation per topic, always current.
 
-### Prompts
+### 5. One change at a time
 
-| Prompt | Description |
-|---|---|
-| `/sdd-start` | Start a new SDD project |
-| `/sdd-status` | Check pipeline status |
+Hoofy enforces one active change at a time. This isn't a limitation — it's a feature. Scope creep happens when you try to do three things at once. Finish one change, verify it, then start the next.
 
----
+### 6. Trust the Clarity Gate
 
-## Hoofy vs Plan Mode
+When the Clarity Gate asks questions, don't rush past them. Every question it asks represents an ambiguity that would have become a bug, a hallucination, or a "that's not what I meant" moment. Two minutes answering questions saves two hours debugging wrong implementations.
 
-If you use Cursor, Claude Code, Codex, or similar tools, you've probably used plan mode. They're complementary:
+### 7. Hoofy is the architect, Plan mode is the contractor
+
+If your AI tool has a plan/implementation mode, use it **after** Hoofy specs are done. Hoofy answers WHO and WHAT. Plan mode answers HOW.
 
 ```
-┌─────────────────────────────────────────────┐
-│  Hoofy (Requirements + Memory Layer)        │
-│  WHO are the users? WHAT must the system    │
-│  do? What happened in yesterday's session?  │
-├─────────────────────────────────────────────┤
-│  /plan mode (Implementation Layer)          │
-│  What files? What functions? What tests?    │
-└─────────────────────────────────────────────┘
+Hoofy (Requirements Layer)  →  "WHAT are we building? For WHO?"
+Plan Mode (Implementation)  →  "HOW do we build it? Which files?"
 ```
-
-**Hoofy is the architect. Plan mode is the contractor.** You wouldn't hire a contractor without blueprints — and you shouldn't use plan mode without specifications.
 
 ---
 
