@@ -1,6 +1,6 @@
 # Tool Reference
 
-Hoofy exposes **31 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
+Hoofy exposes **30 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
 
 ---
 

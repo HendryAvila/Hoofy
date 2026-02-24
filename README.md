@@ -30,7 +30,7 @@ Hoofy is three systems in one MCP server:
 | **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). | 4 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate that blocks hallucinations. | 8 `sdd_*` tools |
 
-One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **31 tools total.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **30 tools total.**
 
 ### Key Features
 
@@ -82,7 +82,7 @@ flowchart TB
     style C5 fill:#10b981,stroke:#059669,color:#fff
 ```
 
-> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (31 tools)](docs/tool-reference.md)**
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (30 tools)](docs/tool-reference.md)**
 
 ---
 
@@ -132,7 +132,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
- > The **MCP server** is Hoofy itself — the binary you just installed. It provides 31 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
+ > The **MCP server** is Hoofy itself — the binary you just installed. It provides 30 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
 >
