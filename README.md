@@ -27,10 +27,10 @@ Hoofy is three systems in one MCP server:
 | System | What it does | Tools |
 |---|---|---|
 | **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. Decisions, bugs, patterns, discoveries — your AI remembers what happened yesterday. | 17 `mem_*` tools |
-| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). | 4 `sdd_change*` + `sdd_adr` |
-| **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate that blocks hallucinations. | 8 `sdd_*` tools |
+| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Now includes a **context-check** stage in every flow. | 5 `sdd_change*` + `sdd_adr` |
+| **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate and **business rules extraction** that blocks hallucinations. | 9 `sdd_*` tools |
 
-One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **30 tools total.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **32 tools total.**
 
 ### Key Features
 
@@ -41,6 +41,10 @@ Decision: "Switched to JWT"  →(caused_by)→  Discovery: "Session storage does
     ↑(implements)                               ↑(relates_to)
 Bugfix: "Fixed token expiry"              Pattern: "Retry with backoff"
 ```
+
+**Context Check** — Every change pipeline flow now starts with a mandatory context-check stage. Before writing a single spec or line of code, Hoofy scans your existing specs, completed changes, memory observations, and convention files (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, etc.) to detect conflicts and ambiguities. Zero issues = green light. Issues found = must resolve before proceeding. Even a one-line fix can break an existing business rule.
+
+**Business Rules** — In the greenfield project pipeline, a dedicated business-rules stage extracts declarative rules from your requirements using BRG taxonomy (Definitions, Facts, Constraints, Derivations) and DDD Ubiquitous Language — before the Clarity Gate evaluates them. Rules inform the gate, not the other way around.
 
 **Pre-pipeline Exploration** — Before committing to a pipeline, use `sdd_explore` to capture unstructured thinking — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory via topic key upsert (call it multiple times as your thinking evolves — it updates, never duplicates). It also suggests a change type and size based on keywords, so you start the right pipeline.
 
@@ -54,14 +58,16 @@ flowchart TB
 
     subgraph project ["New Project (greenfield)"]
         direction LR
-        P1[Init] --> P2[Propose] --> P3[Requirements] --> P4{Clarity Gate}
+        P1[Init] --> P2[Propose] --> P3[Requirements] --> P3b["Business\nRules"]
+        P3b --> P4{Clarity Gate}
         P4 -->|Ambiguous| P3
         P4 -->|Clear| P5[Design] --> P6[Tasks] --> P7[Validate]
     end
 
     subgraph change ["Existing Project (changes)"]
         direction LR
-        C1["sdd_change\n(type × size)"] --> C2["Opening Stage\n(describe/propose/scope)"]
+        C1["sdd_change\n(type × size)"] --> C1b["Context\nCheck"]
+        C1b --> C2["Opening Stage\n(describe/propose/scope)"]
         C2 --> C3["Spec + Design\n(if needed)"]
         C3 --> C4[Tasks] --> C5[Verify]
     end
@@ -78,11 +84,13 @@ flowchart TB
 
     style explore fill:#8b5cf6,stroke:#7c3aed,color:#fff
     style P4 fill:#f59e0b,stroke:#d97706,color:#000
+    style P3b fill:#e879f9,stroke:#c026d3,color:#000
+    style C1b fill:#e879f9,stroke:#c026d3,color:#000
     style P7 fill:#10b981,stroke:#059669,color:#fff
     style C5 fill:#10b981,stroke:#059669,color:#fff
 ```
 
-> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (30 tools)](docs/tool-reference.md)**
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (32 tools)](docs/tool-reference.md)**
 
 ---
 
@@ -132,7 +140,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
- > The **MCP server** is Hoofy itself — the binary you just installed. It provides 30 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
+ > The **MCP server** is Hoofy itself — the binary you just installed. It provides 32 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
 >
@@ -328,9 +336,9 @@ Do NOT start coding without specs for any non-trivial change.
 The AI will try to jump straight to coding. Don't let it. For any non-trivial work:
 - **New project?** → `sdd_init_project` and walk through the full pipeline
 - **New feature?** → `sdd_change(type: "feature", size: "medium")` at minimum
-- **Bug fix?** → Even `sdd_change(type: "fix", size: "small")` gives you describe → tasks → verify
+- **Bug fix?** → Even `sdd_change(type: "fix", size: "small")` gives you context-check → describe → tasks → verify
 
-The three cheapest stages (describe + tasks + verify) take under 2 minutes and save hours of debugging hallucinated code.
+The cheapest stages (context-check + describe + tasks + verify) take under 2 minutes and save hours of debugging hallucinated code.
 
 ### 2. Explore before you plan
 
@@ -342,9 +350,9 @@ Don't use a large pipeline for a one-line fix. Don't use a small pipeline for a 
 
 | If the change... | It's probably... |
 |---|---|
-| Touches 1-2 files, clear fix | **small** (3 stages) |
-| Needs requirements or design thought | **medium** (4 stages) |
-| Affects architecture, multiple systems | **large** (5-6 stages) |
+| Touches 1-2 files, clear fix | **small** (4 stages — context-check + describe + tasks + verify) |
+| Needs requirements or design thought | **medium** (5 stages) |
+| Affects architecture, multiple systems | **large** (6-7 stages) |
 
 ### 4. Let memory work for you
 
@@ -391,6 +399,14 @@ Hoofy's specification pipeline isn't built on opinions. It's built on research:
 - **McKinsey 2025**: Top performers see [16-30% productivity gains](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/superagency-in-the-workplace-empowering-people-to-unlock-ais-full-potential-at-work) only with structured specification and communication.
 
 - **IEEE Requirements Engineering**: Fixing a requirement error in production costs [10-100x more](https://ieeexplore.ieee.org/document/720574) than fixing it during requirements. This multiplier is worse with AI-generated code.
+
+- **IREB & IEEE 29148**: Industry standards for requirements engineering — structured elicitation, traceability, and ambiguity detection. Hoofy's Clarity Gate and server instructions implement frameworks from these standards.
+
+- **Business Rules Group (BRG)**: The [Business Rules Manifesto](https://www.businessrulesgroup.org/brmanifesto.htm) establishes that rules are first-class citizens, not buried in code. Hoofy's business-rules stage uses BRG taxonomy (Definitions, Facts, Constraints, Derivations) to extract declarative rules.
+
+- **EARS (Easy Approach to Requirements Syntax)**: Research-backed sentence templates that eliminate ambiguity in natural-language requirements. Hoofy's server instructions use EARS patterns for the AI to follow.
+
+- **DDD Ubiquitous Language**: Domain-Driven Design's principle that a shared language eliminates translation errors. Hoofy's business-rules stage builds a glossary as part of the Ubiquitous Language.
 
 **Structure beats speed.**
 

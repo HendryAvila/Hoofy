@@ -85,12 +85,14 @@ For building something from scratch. The pipeline forces you to think through re
 flowchart LR
     A[Init] --> B[Propose]
     B --> C[Requirements]
-    C --> D{Clarity Gate}
+    C --> BR["Business\nRules"]
+    BR --> D{Clarity Gate}
     D -->|Score < threshold| C
     D -->|Score ≥ threshold| E[Design]
     E --> F[Tasks]
     F --> G[Validate]
 
+    style BR fill:#e879f9,stroke:#c026d3,color:#000
     style D fill:#f59e0b,stroke:#d97706,color:#000
     style G fill:#10b981,stroke:#059669,color:#fff
 ```
@@ -131,7 +133,22 @@ The AI reads the proposal and extracts formal requirements with MoSCoW prioritiz
 > **AI**: *"NFR-001: CLI response time must be under 200ms"*
 > **AI**: *Writes requirements to `sdd/requirements.md`*
 
-**Stage 4 — Clarity Gate** (`sdd_clarify`) ⚡
+**Stage 4 — Business Rules** (`sdd_create_business_rules`)
+
+The AI reads the requirements and extracts declarative business rules using the BRG (Business Rules Group) taxonomy and DDD Ubiquitous Language:
+
+- **Definitions** — What terms mean in this domain (glossary)
+- **Facts** — Structural truths about entities and relationships
+- **Constraints** — Conditions that must always be true (invariants)
+- **Derivations** — Values computed from other values
+
+> **AI**: *"RULE-001 (Constraint): A habit's daily goal must be a positive integer ≥ 1"*
+> **AI**: *"RULE-002 (Fact): A user has zero or more habits. Each habit belongs to exactly one user."*
+> **AI**: *Writes rules to `sdd/business-rules.md`*
+
+Rules are extracted FROM requirements and inform the Clarity Gate — the gate evaluates WITH the rules, not before them.
+
+**Stage 5 — Clarity Gate** (`sdd_clarify`) ⚡
 
 This is the core innovation. The AI analyzes your requirements across **8 dimensions**:
 
@@ -158,7 +175,7 @@ If ambiguities are found, the AI asks you specific questions. You answer, it res
 >
 > **AI**: *Score jumps from 55 to 78 — gate passes*
 
-**Stage 5 — Design** (`sdd_create_design`)
+**Stage 6 — Design** (`sdd_create_design`)
 
 Now the AI writes the technical architecture:
 - Architecture overview and patterns
@@ -171,7 +188,7 @@ Now the AI writes the technical architecture:
 
 > **AI**: *Writes design to `sdd/design.md`*
 
-**Stage 6 — Tasks** (`sdd_create_tasks`)
+**Stage 7 — Tasks** (`sdd_create_tasks`)
 
 The AI breaks the design into atomic, implementable tasks. Each task has:
 - Unique ID (TASK-001)
@@ -185,7 +202,7 @@ The AI breaks the design into atomic, implementable tasks. Each task has:
 > **AI**: *"TASK-001: Set up project scaffolding → TASK-002: Implement habit storage → TASK-003: Add CLI commands..."*
 > **AI**: *Writes tasks to `sdd/tasks.md`*
 
-**Stage 7 — Validate** (`sdd_validate`)
+**Stage 8 — Validate** (`sdd_validate`)
 
 Cross-artifact consistency check. The AI verifies:
 - Every requirement has at least one task covering it
@@ -202,6 +219,7 @@ sdd/
 ├── sdd.json           # Pipeline state and config
 ├── proposal.md        # Problem, users, solution, scope
 ├── requirements.md    # Formal requirements (MoSCoW)
+├── business-rules.md  # Declarative rules (BRG taxonomy + DDD)
 ├── clarifications.md  # Clarity Gate Q&A
 ├── design.md          # Technical architecture
 ├── tasks.md           # Implementation breakdown
@@ -214,13 +232,14 @@ Every artifact is a markdown file you can read, edit, and version control. The A
 
 ## Workflow 2: Changes in an Existing Project
 
-For ongoing development. The pipeline **adapts** — a small bug fix gets 3 stages, a large feature gets 6.
+For ongoing development. The pipeline **adapts** — a small bug fix gets 4 stages, a large feature gets 7.
 
 ### The Pipeline
 
 ```mermaid
 flowchart LR
-    A[Create Change] --> B[Opening Stage]
+    A[Create Change] --> CC["Context\nCheck"]
+    CC --> B[Opening Stage]
     B --> C{More stages?}
     C -->|Yes| D[Next Stage]
     D --> C
@@ -228,40 +247,43 @@ flowchart LR
     E --> F[Verify]
 
     style A fill:#6366f1,stroke:#4f46e5,color:#fff
+    style CC fill:#e879f9,stroke:#c026d3,color:#000
     style F fill:#10b981,stroke:#059669,color:#fff
 ```
 
+Every change — regardless of type or size — begins with a **context-check** stage. The tool scans existing specs, completed changes, memory observations, and convention files to detect conflicts before you proceed.
+
 The opening stage and intermediate stages change based on **type × size**:
 
-### Example: Small Fix (3 stages)
+### Example: Small Fix (4 stages)
 
 > **You**: "The search crashes when the query is empty"
 
 ```
-describe → tasks → verify
+context-check → describe → tasks → verify
 ```
 
-The AI describes the bug, breaks the fix into tasks, and verifies. Quick, minimal ceremony.
+The AI scans for conflicts, describes the bug, breaks the fix into tasks, and verifies. Quick, minimal ceremony — but safe.
 
-### Example: Medium Feature (4 stages)
+### Example: Medium Feature (5 stages)
 
 > **You**: "I want to add CSV export to the reports"
 
 ```
-propose → spec → tasks → verify
+context-check → propose → spec → tasks → verify
 ```
 
-The AI writes a brief proposal, extracts requirements, creates tasks, and verifies coverage.
+The AI checks for conflicts, writes a brief proposal, extracts requirements, creates tasks, and verifies coverage.
 
-### Example: Large Feature (6 stages)
+### Example: Large Feature (7 stages)
 
 > **You**: "I want to add a plugin system with hooks and lifecycle management"
 
 ```
-propose → spec → clarify → design → tasks → verify
+context-check → propose → spec → clarify → design → tasks → verify
 ```
 
-Full ceremony — proposal, requirements, Clarity Gate, architecture, tasks, validation. The same rigor as a greenfield project, scoped to the change.
+Full ceremony — context check, proposal, requirements, Clarity Gate, architecture, tasks, validation. The same rigor as a greenfield project, scoped to the change.
 
 ### Change Artifacts
 
@@ -270,10 +292,11 @@ Each change lives in its own directory:
 ```
 sdd/changes/
 └── fix-empty-query-crash/
-    ├── change.json     # Metadata (type, size, stages, status)
-    ├── describe.md     # What's the problem?
-    ├── tasks.md        # Implementation breakdown
-    └── verify.md       # Verification results
+    ├── change.json       # Metadata (type, size, stages, status)
+    ├── context-check.md  # Conflict scan results
+    ├── describe.md       # What's the problem?
+    ├── tasks.md          # Implementation breakdown
+    └── verify.md         # Verification results
 ```
 
 ### ADRs (Architecture Decision Records)
@@ -389,17 +412,18 @@ The change pipeline selects stages automatically. Here's every combination:
 
 | Type | Small | Medium | Large |
 |---|---|---|---|
-| **Fix** | describe → tasks → verify | describe → spec → tasks → verify | describe → spec → design → tasks → verify |
-| **Feature** | describe → tasks → verify | propose → spec → tasks → verify | propose → spec → clarify → design → tasks → verify |
-| **Refactor** | scope → tasks → verify | scope → design → tasks → verify | scope → spec → design → tasks → verify |
-| **Enhancement** | describe → tasks → verify | propose → spec → tasks → verify | propose → spec → clarify → design → tasks → verify |
+| **Fix** | context-check → describe → tasks → verify | context-check → describe → spec → tasks → verify | context-check → describe → spec → design → tasks → verify |
+| **Feature** | context-check → describe → tasks → verify | context-check → propose → spec → tasks → verify | context-check → propose → spec → clarify → design → tasks → verify |
+| **Refactor** | context-check → scope → tasks → verify | context-check → scope → design → tasks → verify | context-check → scope → spec → design → tasks → verify |
+| **Enhancement** | context-check → describe → tasks → verify | context-check → propose → spec → tasks → verify | context-check → propose → spec → clarify → design → tasks → verify |
 
-**12 flows, all deterministic.** The AI picks the right one — you just say what you want to do and how big it is.
+**12 flows, all deterministic.** Every flow starts with context-check — the AI scans for conflicts before proceeding. You just say what you want to do and how big it is.
 
 ### Stage Descriptions
 
 | Stage | Purpose | Used by |
 |---|---|---|
+| `context-check` | Scans existing specs, completed changes, memory, and convention files for conflicts | Every change (mandatory first stage) |
 | `describe` | Quick description of the change | Fix, Feature (S), Enhancement (S) |
 | `scope` | What changes and what stays the same | Refactor only |
 | `propose` | Full proposal with problem/solution/scope | Feature (M/L), Enhancement (M/L) |
