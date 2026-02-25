@@ -119,8 +119,8 @@ func TestChangeTool_Handle_Success(t *testing.T) {
 	if !strings.Contains(text, "describe") {
 		t.Error("result should show the first stage (describe for fix/small)")
 	}
-	if !strings.Contains(text, "3 stages") {
-		t.Error("result should show stage count (3 for fix/small)")
+	if !strings.Contains(text, "4 stages") {
+		t.Error("result should show stage count (4 for fix/small)")
 	}
 }
 
@@ -168,8 +168,8 @@ func TestChangeTool_Handle_CreatesFiles(t *testing.T) {
 	if change.Status != changes.StatusActive {
 		t.Errorf("status = %q, want active", change.Status)
 	}
-	if len(change.Stages) != 6 {
-		t.Errorf("stages count = %d, want 6 for feature/large", len(change.Stages))
+	if len(change.Stages) != 7 {
+		t.Errorf("stages count = %d, want 7 for feature/large", len(change.Stages))
 	}
 }
 

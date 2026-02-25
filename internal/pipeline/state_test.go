@@ -47,10 +47,11 @@ func TestStageIndex_AllStages(t *testing.T) {
 		{config.StageInit, 0},
 		{config.StagePropose, 1},
 		{config.StageSpecify, 2},
-		{config.StageClarify, 3},
-		{config.StageDesign, 4},
-		{config.StageTasks, 5},
-		{config.StageValidate, 6},
+		{config.StageBusinessRules, 3},
+		{config.StageClarify, 4},
+		{config.StageDesign, 5},
+		{config.StageTasks, 6},
+		{config.StageValidate, 7},
 	}
 
 	for _, tt := range tests {
@@ -214,6 +215,7 @@ func TestAdvance_FullPipeline(t *testing.T) {
 	expected := []config.Stage{
 		config.StagePropose,
 		config.StageSpecify,
+		config.StageBusinessRules,
 		config.StageClarify,
 		config.StageDesign,
 		config.StageTasks,

@@ -48,20 +48,20 @@ func TestCurrentStageIndex_FirstStage(t *testing.T) {
 }
 
 func TestCurrentStageIndex_MiddleStage(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeMedium) // describe, spec, tasks, verify
+	change := testActiveChange(TypeFix, SizeMedium) // describe, context-check, spec, tasks, verify
 	change.CurrentStage = StageSpec
 	got := CurrentStageIndex(change)
-	if got != 1 {
-		t.Errorf("CurrentStageIndex = %d, want 1", got)
+	if got != 2 {
+		t.Errorf("CurrentStageIndex = %d, want 2", got)
 	}
 }
 
 func TestCurrentStageIndex_LastStage(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeSmall) // describe, tasks, verify
+	change := testActiveChange(TypeFix, SizeSmall) // describe, context-check, tasks, verify
 	change.CurrentStage = StageVerify
 	got := CurrentStageIndex(change)
-	if got != 2 {
-		t.Errorf("CurrentStageIndex = %d, want 2", got)
+	if got != 3 {
+		t.Errorf("CurrentStageIndex = %d, want 3", got)
 	}
 }
 
@@ -159,12 +159,12 @@ func TestCanAdvance_UnknownCurrentStage(t *testing.T) {
 // --- Advance ---
 
 func TestAdvance_MovesToNextStage(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeSmall) // describe → tasks → verify
+	change := testActiveChange(TypeFix, SizeSmall) // describe → context-check → tasks → verify
 	if err := Advance(change); err != nil {
 		t.Fatalf("Advance failed: %v", err)
 	}
-	if change.CurrentStage != StageTasks {
-		t.Errorf("CurrentStage = %s, want tasks", change.CurrentStage)
+	if change.CurrentStage != StageContextCheck {
+		t.Errorf("CurrentStage = %s, want context-check", change.CurrentStage)
 	}
 }
 
@@ -202,10 +202,14 @@ func TestAdvance_UpdatesTimestamp(t *testing.T) {
 }
 
 func TestAdvance_DoesNotAutoCompleteAtVerify(t *testing.T) {
-	// fix/small has 3 stages: describe → tasks → verify
+	// fix/small has 4 stages: describe → context-check → tasks → verify
 	change := testActiveChange(TypeFix, SizeSmall)
 
-	// Advance through describe → tasks.
+	// Advance through describe → context-check.
+	if err := Advance(change); err != nil {
+		t.Fatalf("Advance to context-check failed: %v", err)
+	}
+	// Advance through context-check → tasks.
 	if err := Advance(change); err != nil {
 		t.Fatalf("Advance to tasks failed: %v", err)
 	}
@@ -224,10 +228,11 @@ func TestAdvance_DoesNotAutoCompleteAtVerify(t *testing.T) {
 }
 
 func TestAdvance_CannotAdvancePastFinal(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeSmall)
-	// Advance to verify.
-	_ = Advance(change)
-	_ = Advance(change)
+	change := testActiveChange(TypeFix, SizeSmall) // describe → context-check → tasks → verify
+	// Advance to verify (3 advances for 4-stage flow).
+	_ = Advance(change) // → context-check
+	_ = Advance(change) // → tasks
+	_ = Advance(change) // → verify
 
 	err := Advance(change)
 	if err == nil {
@@ -239,8 +244,8 @@ func TestAdvance_CannotAdvancePastFinal(t *testing.T) {
 }
 
 func TestAdvance_FullFlow_FixSmall(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeSmall) // describe → tasks → verify
-	expected := []ChangeStage{StageTasks, StageVerify}
+	change := testActiveChange(TypeFix, SizeSmall) // describe → context-check → tasks → verify
+	expected := []ChangeStage{StageContextCheck, StageTasks, StageVerify}
 
 	for _, want := range expected {
 		if err := Advance(change); err != nil {
@@ -259,8 +264,8 @@ func TestAdvance_FullFlow_FixSmall(t *testing.T) {
 
 func TestAdvance_FullFlow_FeatureLarge(t *testing.T) {
 	change := testActiveChange(TypeFeature, SizeLarge)
-	// propose → spec → clarify → design → tasks → verify
-	expected := []ChangeStage{StageSpec, StageClarify, StageDesign, StageTasks, StageVerify}
+	// propose → context-check → spec → clarify → design → tasks → verify
+	expected := []ChangeStage{StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify}
 
 	for _, want := range expected {
 		if err := Advance(change); err != nil {
@@ -292,7 +297,8 @@ func TestAdvance_FailsOnCompletedChange(t *testing.T) {
 // --- CompleteChange ---
 
 func TestCompleteChange_AtVerifyStage(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeSmall) // describe → tasks → verify
+	change := testActiveChange(TypeFix, SizeSmall) // describe → context-check → tasks → verify
+	_ = Advance(change)                            // → context-check
 	_ = Advance(change)                            // → tasks
 	_ = Advance(change)                            // → verify
 
@@ -355,9 +361,10 @@ func TestCompleteChange_UnknownCurrentStage(t *testing.T) {
 }
 
 func TestCompleteChange_UpdatesTimestamp(t *testing.T) {
-	change := testActiveChange(TypeFix, SizeSmall)
-	_ = Advance(change)
-	_ = Advance(change)
+	change := testActiveChange(TypeFix, SizeSmall) // describe → context-check → tasks → verify
+	_ = Advance(change)                            // → context-check
+	_ = Advance(change)                            // → tasks
+	_ = Advance(change)                            // → verify
 	change.UpdatedAt = "2020-01-01T00:00:00Z"
 
 	if err := CompleteChange(change); err != nil {
@@ -372,9 +379,12 @@ func TestCompleteChange_UpdatesTimestamp(t *testing.T) {
 
 func TestFullLifecycle_AdvanceThenComplete(t *testing.T) {
 	change := testActiveChange(TypeFeature, SizeMedium)
-	// propose → spec → tasks → verify
+	// propose → context-check → spec → tasks → verify
 
 	// Advance through all stages.
+	if err := Advance(change); err != nil {
+		t.Fatalf("Advance to context-check failed: %v", err)
+	}
 	if err := Advance(change); err != nil {
 		t.Fatalf("Advance to spec failed: %v", err)
 	}

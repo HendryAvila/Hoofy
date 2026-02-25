@@ -7,29 +7,33 @@ import "fmt"
 // the flow adapts to what the change actually needs.
 //
 // All flows end with StageVerify. The stages before it vary:
-//   - Small changes: minimal documentation (3 stages)
-//   - Medium changes: moderate documentation (4 stages)
-//   - Large changes: comprehensive documentation (5-6 stages)
+//   - Small changes: minimal documentation (4 stages)
+//   - Medium changes: moderate documentation (5 stages)
+//   - Large changes: comprehensive documentation (6-7 stages)
+//
+// StageContextCheck is ALWAYS at index 1 (after the initial stage, before
+// everything else). This ensures every change — even small ones — scans
+// existing specs and business rules for conflicts before proceeding.
 var FlowRegistry = map[ChangeType]map[ChangeSize][]ChangeStage{
 	TypeFix: {
-		SizeSmall:  {StageDescribe, StageTasks, StageVerify},
-		SizeMedium: {StageDescribe, StageSpec, StageTasks, StageVerify},
-		SizeLarge:  {StageDescribe, StageSpec, StageDesign, StageTasks, StageVerify},
+		SizeSmall:  {StageDescribe, StageContextCheck, StageTasks, StageVerify},
+		SizeMedium: {StageDescribe, StageContextCheck, StageSpec, StageTasks, StageVerify},
+		SizeLarge:  {StageDescribe, StageContextCheck, StageSpec, StageDesign, StageTasks, StageVerify},
 	},
 	TypeFeature: {
-		SizeSmall:  {StageDescribe, StageTasks, StageVerify},
-		SizeMedium: {StagePropose, StageSpec, StageTasks, StageVerify},
-		SizeLarge:  {StagePropose, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+		SizeSmall:  {StageDescribe, StageContextCheck, StageTasks, StageVerify},
+		SizeMedium: {StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
+		SizeLarge:  {StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 	},
 	TypeRefactor: {
-		SizeSmall:  {StageScope, StageTasks, StageVerify},
-		SizeMedium: {StageScope, StageDesign, StageTasks, StageVerify},
-		SizeLarge:  {StageScope, StageSpec, StageDesign, StageTasks, StageVerify},
+		SizeSmall:  {StageScope, StageContextCheck, StageTasks, StageVerify},
+		SizeMedium: {StageScope, StageContextCheck, StageDesign, StageTasks, StageVerify},
+		SizeLarge:  {StageScope, StageContextCheck, StageSpec, StageDesign, StageTasks, StageVerify},
 	},
 	TypeEnhancement: {
-		SizeSmall:  {StageDescribe, StageTasks, StageVerify},
-		SizeMedium: {StagePropose, StageSpec, StageTasks, StageVerify},
-		SizeLarge:  {StagePropose, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+		SizeSmall:  {StageDescribe, StageContextCheck, StageTasks, StageVerify},
+		SizeMedium: {StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
+		SizeLarge:  {StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 	},
 }
 
@@ -60,14 +64,15 @@ func StageFlow(t ChangeType, s ChangeSize) ([]ChangeStage, error) {
 
 // stageFilenames maps change stages to their artifact filenames.
 var stageFilenames = map[ChangeStage]string{
-	StageDescribe: "describe.md",
-	StageScope:    "scope.md",
-	StagePropose:  "propose.md",
-	StageSpec:     "spec.md",
-	StageClarify:  "clarify.md",
-	StageDesign:   "design.md",
-	StageTasks:    "tasks.md",
-	StageVerify:   "verify.md",
+	StageDescribe:     "describe.md",
+	StageScope:        "scope.md",
+	StagePropose:      "propose.md",
+	StageContextCheck: "context-check.md",
+	StageSpec:         "spec.md",
+	StageClarify:      "clarify.md",
+	StageDesign:       "design.md",
+	StageTasks:        "tasks.md",
+	StageVerify:       "verify.md",
 }
 
 // StageFilename returns the artifact filename for a given stage.

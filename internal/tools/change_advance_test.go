@@ -30,7 +30,7 @@ func TestChangeAdvanceTool_Handle_AdvancesStage(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// fix/small flow: describe → tasks → verify
+	// fix/small flow: describe → context-check → tasks → verify
 	// Current stage: describe (first, in_progress)
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
@@ -49,8 +49,8 @@ func TestChangeAdvanceTool_Handle_AdvancesStage(t *testing.T) {
 	if !strings.Contains(text, "Stage Completed: describe") {
 		t.Error("result should mention completed stage 'describe'")
 	}
-	if !strings.Contains(text, "tasks") {
-		t.Error("result should show next stage 'tasks'")
+	if !strings.Contains(text, "context-check") {
+		t.Error("result should show next stage 'context-check'")
 	}
 
 	// Verify the file was written.
@@ -68,8 +68,8 @@ func TestChangeAdvanceTool_Handle_AdvancesStage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadActive failed: %v", err)
 	}
-	if change.CurrentStage != changes.StageTasks {
-		t.Errorf("current stage = %q, want tasks", change.CurrentStage)
+	if change.CurrentStage != changes.StageContextCheck {
+		t.Errorf("current stage = %q, want context-check", change.CurrentStage)
 	}
 }
 
@@ -80,10 +80,11 @@ func TestChangeAdvanceTool_Handle_CompletesChange(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// fix/small flow: describe → tasks → verify
+	// fix/small flow: describe → context-check → tasks → verify
 	// Advance through all stages.
 	stages := []string{
 		"# Description\n\nFix something.",
+		"# Context Check\n\nNo conflicts found.",
 		"# Tasks\n\n- [ ] Task 1",
 		"# Verification\n\nAll good.",
 	}
@@ -129,9 +130,10 @@ func TestChangeAdvanceTool_Handle_CompletionResponse(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// fix/small: describe → tasks → verify
+	// fix/small: describe → context-check → tasks → verify
 	contents := []string{
 		"# Describe\n\nContent.",
+		"# Context Check\n\nContent.",
 		"# Tasks\n\nContent.",
 		"# Verify\n\nContent.",
 	}
@@ -238,7 +240,7 @@ func TestChangeAdvanceTool_Handle_WritesCorrectFilename(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// refactor/small: scope → tasks → verify
+	// refactor/small: scope → context-check → tasks → verify
 	// First stage: scope → should write scope.md
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
@@ -290,7 +292,7 @@ func TestChangeAdvanceTool_Handle_ProgressMarkers(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// feature/medium: propose → spec → tasks → verify
+	// feature/medium: propose → context-check → spec → tasks → verify
 	// Advance first stage.
 	req := mcp.CallToolRequest{}
 	req.Params.Arguments = map[string]interface{}{
@@ -319,9 +321,10 @@ func TestChangeAdvanceTool_Handle_MediumFlowFullCycle(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// fix/medium: describe → spec → tasks → verify
+	// fix/medium: describe → context-check → spec → tasks → verify
 	contents := []string{
 		"# Describe\n\nDescription.",
+		"# Context Check\n\nNo conflicts.",
 		"# Spec\n\nSpecification.",
 		"# Tasks\n\n- [ ] Task 1",
 		"# Verify\n\nVerification.",
@@ -356,9 +359,10 @@ func TestChangeAdvanceTool_Handle_LargeFlowFullCycle(t *testing.T) {
 	store := changes.NewFileStore()
 	tool := NewChangeAdvanceTool(store)
 
-	// feature/large: propose → spec → clarify → design → tasks → verify
+	// feature/large: propose → context-check → spec → clarify → design → tasks → verify
 	contents := []string{
 		"# Propose\n\nProposal.",
+		"# Context Check\n\nNo conflicts.",
 		"# Spec\n\nSpecification.",
 		"# Clarify\n\nClarifications.",
 		"# Design\n\nArchitecture.",
@@ -385,8 +389,8 @@ func TestChangeAdvanceTool_Handle_LargeFlowFullCycle(t *testing.T) {
 	if change.Status != changes.StatusCompleted {
 		t.Errorf("status = %q, want completed", change.Status)
 	}
-	if len(change.Stages) != 6 {
-		t.Errorf("stages = %d, want 6", len(change.Stages))
+	if len(change.Stages) != 7 {
+		t.Errorf("stages = %d, want 7", len(change.Stages))
 	}
 }
 

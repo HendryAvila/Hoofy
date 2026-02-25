@@ -590,8 +590,8 @@ func TestSpecifyTool_Handle_AdvancesPipeline(t *testing.T) {
 	}
 
 	cfg, _ := store.Load(tmpDir)
-	if cfg.CurrentStage != config.StageClarify {
-		t.Errorf("stage should be clarify after specify, got: %s", cfg.CurrentStage)
+	if cfg.CurrentStage != config.StageBusinessRules {
+		t.Errorf("stage should be business-rules after specify, got: %s", cfg.CurrentStage)
 	}
 }
 

@@ -36,13 +36,14 @@ const (
 type Stage string
 
 const (
-	StageInit     Stage = "init"
-	StagePropose  Stage = "propose"
-	StageSpecify  Stage = "specify"
-	StageClarify  Stage = "clarify"
-	StageDesign   Stage = "design"
-	StageTasks    Stage = "tasks"
-	StageValidate Stage = "validate"
+	StageInit          Stage = "init"
+	StagePropose       Stage = "propose"
+	StageSpecify       Stage = "specify"
+	StageBusinessRules Stage = "business-rules"
+	StageClarify       Stage = "clarify"
+	StageDesign        Stage = "design"
+	StageTasks         Stage = "tasks"
+	StageValidate      Stage = "validate"
 )
 
 // StageOrder defines the sequential pipeline. Used by the pipeline package
@@ -51,6 +52,7 @@ var StageOrder = []Stage{
 	StageInit,
 	StagePropose,
 	StageSpecify,
+	StageBusinessRules,
 	StageClarify,
 	StageDesign,
 	StageTasks,
@@ -66,13 +68,14 @@ type StageMetadata struct {
 
 // Stages maps each Stage to its metadata.
 var Stages = map[Stage]StageMetadata{
-	StageInit:     {Name: "Initialize", Description: "Set up project context, constraints, and SDD structure", Order: 0},
-	StagePropose:  {Name: "Propose", Description: "Transform a vague idea into a structured proposal", Order: 1},
-	StageSpecify:  {Name: "Specify", Description: "Extract formal requirements from the proposal", Order: 2},
-	StageClarify:  {Name: "Clarify", Description: "Detect and resolve ambiguities through the Clarity Gate", Order: 3},
-	StageDesign:   {Name: "Design", Description: "Create technical architecture and design decisions", Order: 4},
-	StageTasks:    {Name: "Tasks", Description: "Break down design into atomic, actionable tasks", Order: 5},
-	StageValidate: {Name: "Validate", Description: "Verify consistency across all artifacts", Order: 6},
+	StageInit:          {Name: "Initialize", Description: "Set up project context, constraints, and SDD structure", Order: 0},
+	StagePropose:       {Name: "Propose", Description: "Transform a vague idea into a structured proposal", Order: 1},
+	StageSpecify:       {Name: "Specify", Description: "Extract formal requirements from the proposal", Order: 2},
+	StageBusinessRules: {Name: "Business Rules", Description: "Extract and document declarative business rules from requirements", Order: 3},
+	StageClarify:       {Name: "Clarify", Description: "Detect and resolve ambiguities through the Clarity Gate", Order: 4},
+	StageDesign:        {Name: "Design", Description: "Create technical architecture and design decisions", Order: 5},
+	StageTasks:         {Name: "Tasks", Description: "Break down design into atomic, actionable tasks", Order: 6},
+	StageValidate:      {Name: "Validate", Description: "Verify consistency across all artifacts", Order: 7},
 }
 
 // StageStatus tracks progress for a single pipeline stage.
@@ -155,12 +158,13 @@ func StageFilename(stage Stage) string {
 
 // stageFilenames maps stages to their output filenames.
 var stageFilenames = map[Stage]string{
-	StagePropose:  "proposal.md",
-	StageSpecify:  "requirements.md",
-	StageClarify:  "clarifications.md",
-	StageDesign:   "design.md",
-	StageTasks:    "tasks.md",
-	StageValidate: "validation.md",
+	StagePropose:       "proposal.md",
+	StageSpecify:       "requirements.md",
+	StageBusinessRules: "business-rules.md",
+	StageClarify:       "clarifications.md",
+	StageDesign:        "design.md",
+	StageTasks:         "tasks.md",
+	StageValidate:      "validation.md",
 }
 
 // --- Persistence (Open/Closed: extend via interfaces, not modification) ---

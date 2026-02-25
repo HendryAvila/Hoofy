@@ -78,6 +78,9 @@ func New() (*server.MCPServer, func(), error) {
 	contextTool := tools.NewContextTool(store)
 	s.AddTool(contextTool.Definition(), contextTool.Handle)
 
+	businessRulesTool := tools.NewBusinessRulesTool(store, renderer)
+	s.AddTool(businessRulesTool.Definition(), businessRulesTool.Handle)
+
 	// --- Register change pipeline tools ---
 	//
 	// The change pipeline is independent from the project pipeline —
@@ -107,6 +110,11 @@ func New() (*server.MCPServer, func(), error) {
 
 	cleanup := noop
 	memStore, memErr := memory.New(memory.DefaultConfig())
+
+	// Context-check tool registered unconditionally — handles nil memStore
+	// internally by skipping memory search (ADR-001: scanner, not analyzer).
+	contextCheckTool := tools.NewContextCheckTool(changeStore, memStore)
+	s.AddTool(contextCheckTool.Definition(), contextCheckTool.Handle)
 	if memErr != nil {
 		log.Printf("WARNING: memory subsystem disabled: %v", memErr)
 	} else {
@@ -126,6 +134,7 @@ func New() (*server.MCPServer, func(), error) {
 		bridge := tools.NewMemoryBridge(memStore)
 		proposeTool.SetBridge(bridge)
 		specifyTool.SetBridge(bridge)
+		businessRulesTool.SetBridge(bridge)
 		clarifyTool.SetBridge(bridge)
 		designTool.SetBridge(bridge)
 		tasksTool.SetBridge(bridge)
@@ -286,14 +295,15 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
 - The type/size suggestion is a HINT — the user decides
 
 ## What is SDD?
-Spec-Driven Development reduces AI hallucinations by forcing clear specifications 
+Spec-Driven Development reduces AI hallucinations by forcing clear specifications
 BEFORE writing code. Ambiguous requirements are the #1 cause of bad AI-generated code.
+(Source: IEEE 29148 — "well-formed requirements" prevent defects downstream)
 
 ## CRITICAL: How Tools Work
 Hoofy tools are STORAGE tools, not AI tools. They save content YOU generate.
 The workflow for each stage is:
 
-1. TALK to the user → understand their idea, ask questions
+1. TALK to the user — understand their idea, ask questions
 2. GENERATE the content yourself (proposals, requirements, etc.)
 3. CALL the tool with the ACTUAL content as parameters
 4. The tool saves it to disk and advances the pipeline
@@ -302,21 +312,26 @@ NEVER call a tool with placeholder text like "TBD" or "to be defined".
 ALWAYS generate real, substantive content based on your conversation with the user.
 
 ## Pipeline
-SDD follows a sequential 7-stage pipeline:
-1. INIT → Set up the project (call sdd_init_project)
-2. PROPOSE → Create a structured proposal (YOU write it, tool saves it)
-3. SPECIFY → Extract formal requirements (YOU write them, tool saves them)
-4. CLARIFY → The Clarity Gate: resolve ambiguities (interactive Q&A)
-5. DESIGN → Technical architecture document (YOU design it, tool saves it)
-6. TASKS → Atomic implementation task breakdown (YOU break it down, tool saves it)
-7. VALIDATE → Cross-artifact consistency check (YOU analyze, tool saves report)
+SDD follows a sequential 8-stage pipeline:
+1. INIT — Set up the project (call sdd_init_project)
+2. PROPOSE — Create a structured proposal (YOU write it, tool saves it)
+3. SPECIFY — Extract formal requirements with IEEE 29148 quality attributes
+4. BUSINESS RULES — Extract declarative business rules using BRG taxonomy
+5. CLARIFY — The Clarity Gate: resolve ambiguities using EARS patterns
+6. DESIGN — Technical architecture document with ADRs (Michael Nygard format)
+7. TASKS — Atomic task breakdown with execution wave assignments
+8. VALIDATE — Cross-artifact consistency check (YOU analyze, tool saves report)
 
 ## Stage-by-Stage Workflow
 
-### Stage 1: Propose
+### Stage 1: Propose (Research: IREB Elicitation Techniques)
 1. Ask the user about their project idea
-2. Ask follow-up questions to understand the problem, users, and goals
-3. Based on the conversation, generate content for ALL sections:
+2. Use IREB elicitation techniques — ask about CONTEXT, not just features:
+   - Instead of "What features do you want?" ask "What are the top 3 tasks
+     your primary user performs daily that this tool should improve?"
+   - Instead of "Who are the users?" ask "Describe someone who would use this
+     in their first week — what's their role, frustration, and goal?"
+3. Generate content for ALL sections:
    - problem_statement: The core problem (2-3 sentences)
    - target_users: 2-3 specific user personas with needs
    - proposed_solution: High-level description (NO tech details)
@@ -325,28 +340,58 @@ SDD follows a sequential 7-stage pipeline:
    - open_questions: Remaining unknowns
 4. Call sdd_create_proposal with all sections filled in
 
-### Stage 2: Specify
+### Stage 2: Specify (Research: IEEE 29148 Quality Attributes)
 1. Read the proposal from sdd/proposal.md (use sdd_get_context if needed)
 2. Extract formal requirements using MoSCoW prioritization
 3. Each requirement gets a unique ID (FR-001 for functional, NFR-001 for non-functional)
-4. Call sdd_generate_requirements with real requirements content
+4. Apply IEEE 29148 quality attributes — each requirement MUST be:
+   - Necessary: traceable to a user need from the proposal
+   - Unambiguous: one interpretation only (no "etc.", "and/or", "appropriate")
+   - Verifiable: testable with a concrete condition
+   - Consistent: no contradictions with other requirements
+5. Call sdd_generate_requirements with real requirements content
 
-### Stage 3: Clarify (Clarity Gate)
+### Stage 3: Business Rules (Research: BRG Taxonomy, Business Rules Manifesto, DDD)
+1. Read the requirements (use sdd_get_context stage=requirements)
+2. For each requirement, ask: "Is there an implicit business rule here?"
+3. Extract rules into four categories (BRG taxonomy — Business Rules Group):
+   - Definitions: What do domain terms MEAN? Build a Ubiquitous Language
+     (DDD, Eric Evans — every term must have ONE precise meaning)
+   - Facts: What relationships between terms are ALWAYS true?
+   - Constraints: What behavior is NOT allowed? Use declarative format:
+     "When <condition> Then <imposition> [Otherwise <consequence>]"
+     (Business Rules Manifesto, Ronald Ross v2.0)
+   - Derivations: What knowledge is COMPUTED from other rules?
+4. Present the extracted rules to the user for validation
+5. Call sdd_create_business_rules with the validated content
+   Required params: definitions, facts, constraints
+   Optional params: derivations, glossary
+
+### Stage 4: Clarify — Clarity Gate (Research: EARS, Femmer et al. 2017)
 1. Call sdd_clarify WITHOUT answers to get the analysis framework
-2. Analyze the requirements across all 8 dimensions
-3. Generate 3-5 specific questions targeting the weakest areas
-4. Present questions to the user and collect answers
-5. Call sdd_clarify WITH answers and your dimension_scores assessment
-6. If score < threshold, repeat from step 1
+2. Analyze the requirements AND business rules across all 8 dimensions
+3. Use EARS syntax patterns (Rolls-Royce) to test requirement completeness:
+   - Ubiquitous: "The <system> shall <action>" — always active
+   - State-driven: "While <state>, the <system> shall <action>"
+   - Event-driven: "When <trigger>, the <system> shall <action>"
+   - Optional: "Where <feature>, the <system> shall <action>"
+   - Unwanted: "If <condition>, then the <system> shall <action>"
+   If a requirement doesn't fit ANY pattern, it's likely ambiguous.
+4. Generate 3-5 specific questions targeting the weakest areas
+5. Present questions to the user and collect answers
+6. Call sdd_clarify WITH answers and your dimension_scores assessment
+7. If score < threshold, repeat from step 1
 
-### Stage 4: Design
-1. Read ALL previous artifacts (use sdd_get_context for proposal, requirements, clarifications)
-2. Design the technical architecture addressing ALL requirements
+### Stage 5: Design (Research: ADR format — Michael Nygard)
+1. Read ALL previous artifacts (use sdd_get_context for proposal, requirements,
+   business-rules, clarifications)
+2. Design the technical architecture addressing ALL requirements AND business rules
 3. Choose tech stack with rationale, define components, data model, API contracts
-4. Document key architectural decisions (ADRs) with alternatives considered
+4. Document key architectural decisions as ADRs with: Context, Decision, Rationale,
+   Alternatives Rejected (Michael Nygard format)
 5. Call sdd_create_design with the complete architecture document
 
-### Stage 5: Tasks
+### Stage 6: Tasks
 1. Read the design document (use sdd_get_context stage=design)
 2. Break the design into atomic, AI-ready implementation tasks
 3. Each task must have: unique ID (TASK-001), clear scope, requirements covered,
@@ -357,13 +402,15 @@ SDD follows a sequential 7-stage pipeline:
    Wave 1 = Wave 2, etc. Tasks within the same wave can execute in parallel.
 6. Call sdd_create_tasks with the complete task breakdown, including wave_assignments
 
-### Stage 6: Validate
-1. Read ALL artifacts (proposal, requirements, clarifications, design, tasks)
+### Stage 7: Validate
+1. Read ALL artifacts (proposal, requirements, business-rules, clarifications,
+   design, tasks)
 2. Cross-reference every requirement against tasks (coverage analysis)
 3. Cross-reference every component against tasks (component coverage)
 4. Check for inconsistencies between artifacts
-5. Assess risks and provide recommendations
-6. Call sdd_validate with the full analysis and verdict (PASS/PASS_WITH_WARNINGS/FAIL)
+5. Verify business rules are reflected in design and tasks
+6. Assess risks and provide recommendations
+7. Call sdd_validate with the full analysis and verdict (PASS/PASS_WITH_WARNINGS/FAIL)
 
 ## Modes
 - Guided: More questions, examples, encouragement. For non-technical users.
@@ -380,7 +427,7 @@ SDD follows a sequential 7-stage pipeline:
 - Be specific — "users" is not a valid target audience
 - In Guided mode: use simple language, give examples, be encouraging
 - In Expert mode: be direct, technical language is fine
-- After validation, the user's SDD specs are ready for implementation with /plan mode
+- After validation, the user's SDD specs are ready for implementation
 
 ## PERSISTENT MEMORY
 
@@ -463,39 +510,104 @@ This transforms flat memories into a navigable web of connected decisions, patte
 ## ADAPTIVE CHANGE PIPELINE
 
 For ongoing development (features, fixes, refactors, enhancements), use the
-adaptive change pipeline instead of the full 7-stage SDD pipeline.
+adaptive change pipeline instead of the full 8-stage SDD pipeline.
 
 ### When to Use Changes vs Full Pipeline
 - **Full pipeline** (sdd_init_project): Brand new projects from scratch
 - **Change pipeline** (sdd_change): Any modification to an existing codebase
 
 ### How It Works
-Each change has a TYPE and SIZE that determine the pipeline stages:
+Each change has a TYPE and SIZE that determine the pipeline stages.
+ALL flows include a mandatory context-check stage (see below).
 
 **Types**: feature, fix, refactor, enhancement
-**Sizes**: small (3 stages), medium (4 stages), large (5-6 stages)
+**Sizes**: small (4 stages), medium (5 stages), large (6-7 stages)
 
 ### Stage Flows by Type and Size
 
-**Fix**: 
-- small: describe → tasks → verify
-- medium: describe → spec → tasks → verify
-- large: describe → spec → design → tasks → verify
+**Fix**:
+- small: describe → context-check → tasks → verify
+- medium: describe → context-check → spec → tasks → verify
+- large: describe → context-check → spec → design → tasks → verify
 
 **Feature**:
-- small: describe → tasks → verify
-- medium: propose → spec → tasks → verify
-- large: propose → spec → clarify → design → tasks → verify
+- small: describe → context-check → tasks → verify
+- medium: propose → context-check → spec → tasks → verify
+- large: propose → context-check → spec → clarify → design → tasks → verify
 
 **Refactor**:
-- small: scope → tasks → verify
-- medium: scope → design → tasks → verify
-- large: scope → spec → design → tasks → verify
+- small: scope → context-check → tasks → verify
+- medium: scope → context-check → design → tasks → verify
+- large: scope → context-check → spec → design → tasks → verify
 
 **Enhancement**:
-- small: describe → tasks → verify
-- medium: propose → spec → tasks → verify
-- large: propose → spec → clarify → design → tasks → verify
+- small: describe → context-check → tasks → verify
+- medium: propose → context-check → spec → tasks → verify
+- large: propose → context-check → spec → clarify → design → tasks → verify
+
+### Context-Check Stage (Research: IEEE 29148, Femmer et al. 2017, Bohner & Arnold)
+
+The context-check stage is a MANDATORY gate in every change flow. It prevents
+conflicts with existing specs, detects ambiguity early, and classifies impact.
+Even a small change can break a business rule — context-check catches that.
+
+When context-check is the current stage:
+
+1. Call sdd_context_check with the change description and optional project_name
+   - The tool SCANS filesystem and memory, returning a structured report
+   - It does NOT analyze — YOU analyze the report using the heuristics below
+
+2. Read the returned report — it contains:
+   - Existing SDD artifacts (proposals, requirements, business rules, design)
+   - Keyword-matched completed changes (max 10, ranked by relevance)
+   - Explore observations from memory (if available)
+   - Convention files (if no SDD artifacts exist — CLAUDE.md, AGENTS.md, etc.)
+
+3. Analyze for ambiguity using Requirements Smells (Femmer et al. 2017, IEEE 29148):
+   - Subjective language: "user-friendly", "fast", "easy", "intuitive", "simple"
+   - Ambiguous adverbs: "often", "sometimes", "usually", "typically", "mostly"
+   - Non-verifiable terms: "high quality", "good performance", "secure enough"
+   - Superlatives: "best", "fastest", "most efficient"
+   - Negative statements hiding requirements: "the system shall not..."
+   - Comparatives without baseline: "faster than", "better than", "more reliable"
+   - Totality terms: "all", "every", "always", "never" (are these truly universal?)
+
+4. Check for conflicts with existing specs and business rules:
+   - Does this change contradict any existing constraint or business rule?
+   - Does it modify behavior covered by existing requirements (FR-XXX)?
+   - Does it introduce terms not in the Ubiquitous Language glossary?
+   - Does it reference components or requirement IDs that don't exist?
+
+5. Classify impact (SemVer model — Bohner & Arnold, Software Change Impact Analysis):
+   - **Breaking**: changes existing behavior (existing tests would fail)
+   - **Non-breaking**: adds new behavior without affecting existing
+   - **Patch**: internal change, no behavior modification
+
+6. Generate the context-check.md content and call sdd_change_advance
+
+**If critical issues are found**:
+- Present them to the user with specific questions
+- Wait for answers before generating context-check.md
+- Include both questions and answers in the artifact
+
+**If no issues found**:
+- Generate a brief "all clear" documenting what was checked
+- Proceed to the next stage
+
+### Good vs Bad Questions (Research: IREB Elicitation Techniques)
+
+Bad (vague, answerable with yes/no):
+- "Is this change safe?" → too vague, no actionable answer
+- "Will this break anything?" → invites unverified "no"
+- "Are there any edge cases?" → too broad, produces hand-waving
+
+Good (specific, evidence-based, probing):
+- "FR-012 requires email notifications on status change. Your change modifies
+  the status enum — which notification templates need updating?"
+- "The business rule says 'orders over $500 require manager approval'. Your
+  change removes the approval step — is this rule being deprecated?"
+- "The existing design uses JWT with 15-min expiry. Your change adds a
+  'remember me' feature — what should the extended token lifetime be?"
 
 ### Change Pipeline Workflow
 
@@ -513,7 +625,7 @@ Each change has a TYPE and SIZE that determine the pipeline stages:
    stage progress, artifact sizes, and ADRs
 
 4. **Capture decisions**: Call sdd_adr at any time to record an
-   Architecture Decision Record
+   Architecture Decision Record (Michael Nygard format)
    - With active change: saves ADR file + updates change record
    - Without active change: saves to memory only (standalone ADR)
 
@@ -523,6 +635,7 @@ Each change has a TYPE and SIZE that determine the pipeline stages:
 - Generate REAL content for each stage — no placeholders
 - All flows end with verify — use it to validate the change
 - ADRs can be captured at any time during a change
+- Context-check is MANDATORY — never skip it, even for small changes
 
 ### Wave Assignments in Tasks Stage
 When writing content for the **tasks** stage (both project pipeline and change pipeline),

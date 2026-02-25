@@ -62,7 +62,7 @@ func TestIntegration_FullFixSmallFlow(t *testing.T) {
 		t.Error("status: should show in_progress marker")
 	}
 
-	// Step 3: Advance through all 3 stages (describe → tasks → verify).
+	// Step 3: Advance through all 4 stages (describe → context-check → tasks → verify).
 	stageContents := []struct {
 		content      string
 		expectNext   string
@@ -70,6 +70,10 @@ func TestIntegration_FullFixSmallFlow(t *testing.T) {
 	}{
 		{
 			content:    "# Bug Description\n\nNull pointer dereference when search query is empty.\n\n## Root Cause\n\nMissing nil check on `results` before accessing `.Rows`.",
+			expectNext: "context-check",
+		},
+		{
+			content:    "# Context Check\n\nNo conflicting specs or business rules found. Safe to proceed.",
 			expectNext: "tasks",
 		},
 		{
@@ -159,9 +163,10 @@ func TestIntegration_FeatureLargeWithADRs(t *testing.T) {
 		t.Fatalf("create: %v", err)
 	}
 
-	// feature/large: propose → spec → clarify → design → tasks → verify
+	// feature/large: propose → context-check → spec → clarify → design → tasks → verify
 	stageContents := []string{
 		"# Proposal\n\nAdd JWT-based user authentication with email/password login.",
+		"# Context Check\n\nNo conflicting specs found. No prior auth changes detected.",
 		"# Specification\n\n## FR-001: User Registration\nUsers can register with email and password.",
 		"# Clarifications\n\nQ: OAuth support?\nA: Not in v1, only email/password.",
 		"# Design\n\n## Architecture\nJWT with refresh tokens, bcrypt hashing.\n\n## Components\n- AuthModule\n- UserModule",
@@ -169,7 +174,7 @@ func TestIntegration_FeatureLargeWithADRs(t *testing.T) {
 		"# Verification\n\nAll requirements covered. Tests passing.",
 	}
 
-	// Capture an ADR after the design stage (stage index 3).
+	// Capture an ADR after the design stage (stage index 4).
 	for i, content := range stageContents {
 		advanceReq := mcp.CallToolRequest{}
 		advanceReq.Params.Arguments = map[string]interface{}{
@@ -184,8 +189,8 @@ func TestIntegration_FeatureLargeWithADRs(t *testing.T) {
 			t.Fatalf("advance stage %d: error: %s", i, getResultText(result))
 		}
 
-		// After design stage (index 3), capture an ADR.
-		if i == 3 {
+		// After design stage (index 4), capture an ADR.
+		if i == 4 {
 			adrReq := mcp.CallToolRequest{}
 			adrReq.Params.Arguments = map[string]interface{}{
 				"title":                 "JWT over session cookies",
@@ -241,9 +246,9 @@ func TestIntegration_FeatureLargeWithADRs(t *testing.T) {
 		t.Error("status should show ADR-001")
 	}
 
-	// Verify all 6 stage artifacts exist.
+	// Verify all 7 stage artifacts exist.
 	expectedFiles := []string{
-		"propose.md", "spec.md", "clarify.md",
+		"propose.md", "context-check.md", "spec.md", "clarify.md",
 		"design.md", "tasks.md", "verify.md",
 	}
 	for _, f := range expectedFiles {
@@ -304,7 +309,7 @@ func TestIntegration_RefactorMediumFlow(t *testing.T) {
 	changeTool := NewChangeTool(store)
 	advanceTool := NewChangeAdvanceTool(store)
 
-	// refactor/medium: scope → design → tasks → verify
+	// refactor/medium: scope → context-check → design → tasks → verify
 	createReq := mcp.CallToolRequest{}
 	createReq.Params.Arguments = map[string]interface{}{
 		"type":        "refactor",
@@ -318,6 +323,7 @@ func TestIntegration_RefactorMediumFlow(t *testing.T) {
 
 	stageContents := []string{
 		"# Scope\n\n## What Changes\n- Extract auth logic from handlers into AuthModule\n\n## What Doesn't Change\n- API contract remains the same\n- Database schema unchanged",
+		"# Context Check\n\nNo conflicting specs found. Safe to proceed with refactor.",
 		"# Design\n\n## AuthModule\n- Handles JWT creation and validation\n- Encapsulates bcrypt hashing\n- Exposes clean interface for handlers",
 		"# Tasks\n\n### TASK-001: Create AuthModule interface\n### TASK-002: Move JWT logic\n### TASK-003: Update handlers to use AuthModule",
 		"# Verification\n\n- All existing tests pass\n- No API changes\n- AuthModule has 95% coverage",
@@ -449,9 +455,10 @@ func TestIntegration_AdvanceAfterCompletion(t *testing.T) {
 	store := changes.NewFileStore()
 	advanceTool := NewChangeAdvanceTool(store)
 
-	// Complete all stages.
+	// Complete all stages (fix/small: describe → context-check → tasks → verify).
 	stages := []string{
 		"# Describe\n\nContent.",
+		"# Context Check\n\nContent.",
 		"# Tasks\n\nContent.",
 		"# Verify\n\nContent.",
 	}
@@ -541,5 +548,124 @@ func TestIntegration_BridgeAcrossTools(t *testing.T) {
 	}
 	if notifications[1].stage != "adr" {
 		t.Errorf("second notification stage = %q, want adr", notifications[1].stage)
+	}
+}
+
+func TestIntegration_ContextCheckToolInFlow(t *testing.T) {
+	tmpDir, cleanup := setupChangeProject(t)
+	defer cleanup()
+
+	changeStore := changes.NewFileStore()
+	changeTool := NewChangeTool(changeStore)
+	advanceTool := NewChangeAdvanceTool(changeStore)
+	contextCheckTool := NewContextCheckTool(changeStore, nil) // nil memory — degrades gracefully
+
+	// Create SDD artifacts that context-check will scan.
+	reqContent := "# Requirements\n\n- **FR-001**: Users can register with email and password\n- **FR-002**: Users can log in and receive a JWT token\n"
+	if err := os.WriteFile(filepath.Join(tmpDir, "sdd", "requirements.md"), []byte(reqContent), 0o644); err != nil {
+		t.Fatalf("write requirements: %v", err)
+	}
+
+	// Create an enhancement/small change.
+	createReq := mcp.CallToolRequest{}
+	createReq.Params.Arguments = map[string]interface{}{
+		"type":        "enhancement",
+		"size":        "small",
+		"description": "Add password reset via email token",
+	}
+	result, err := changeTool.Handle(context.Background(), createReq)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("create error: %s", getResultText(result))
+	}
+
+	// Stage 1: Advance describe stage.
+	advanceReq := mcp.CallToolRequest{}
+	advanceReq.Params.Arguments = map[string]interface{}{
+		"content": "# Description\n\nAdd a password reset flow where users receive an email with a reset token.",
+	}
+	result, err = advanceTool.Handle(context.Background(), advanceReq)
+	if err != nil {
+		t.Fatalf("advance describe: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("advance describe error: %s", getResultText(result))
+	}
+	text := getResultText(result)
+	if !strings.Contains(text, "context-check") {
+		t.Error("after describe, next stage should be context-check")
+	}
+
+	// Stage 2: Call the context-check SCANNER tool to get a report.
+	checkReq := mcp.CallToolRequest{}
+	checkReq.Params.Arguments = map[string]interface{}{
+		"change_description": "Add password reset via email token",
+	}
+	result, err = contextCheckTool.Handle(context.Background(), checkReq)
+	if err != nil {
+		t.Fatalf("context-check tool: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("context-check tool error: %s", getResultText(result))
+	}
+
+	// Verify the scanner found our requirements artifact.
+	report := getResultText(result)
+	if !strings.Contains(report, "requirements.md") {
+		t.Error("context-check report should mention requirements.md")
+	}
+
+	// Now advance context-check with the analysis (AI would generate this).
+	advanceReq.Params.Arguments = map[string]interface{}{
+		"content": "# Context Check\n\n## Artifacts Scanned\n- requirements.md (2 FRs found)\n\n## Impact Classification\n- Non-breaking: adds new behavior (password reset) without modifying existing auth flow\n\n## Conflicts\nNone — password reset is additive to FR-001/FR-002.\n\n## Verdict\nAll clear. Safe to proceed.",
+	}
+	result, err = advanceTool.Handle(context.Background(), advanceReq)
+	if err != nil {
+		t.Fatalf("advance context-check: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("advance context-check error: %s", getResultText(result))
+	}
+	text = getResultText(result)
+	if !strings.Contains(text, "tasks") {
+		t.Error("after context-check, next stage should be tasks")
+	}
+
+	// Stage 3: Advance tasks.
+	advanceReq.Params.Arguments = map[string]interface{}{
+		"content": "# Tasks\n\n### TASK-001: Create password reset token model\n### TASK-002: Add POST /auth/reset-password endpoint\n### TASK-003: Send reset email with token link",
+	}
+	if _, err = advanceTool.Handle(context.Background(), advanceReq); err != nil {
+		t.Fatalf("advance tasks: %v", err)
+	}
+
+	// Stage 4: Advance verify — completes the change.
+	advanceReq.Params.Arguments = map[string]interface{}{
+		"content": "# Verification\n\nAll tasks trace to password reset functionality.\nNo conflicts with existing auth requirements (FR-001, FR-002).\nTest coverage planned for all 3 tasks.",
+	}
+	result, err = advanceTool.Handle(context.Background(), advanceReq)
+	if err != nil {
+		t.Fatalf("advance verify: %v", err)
+	}
+	text = getResultText(result)
+	if !strings.Contains(text, "Change completed!") {
+		t.Error("final stage should complete the change")
+	}
+
+	// Verify the context-check artifact was written.
+	checkPath := filepath.Join(tmpDir, "sdd", "changes", "add-password-reset-via-email-token", "context-check.md")
+	if _, err := os.Stat(checkPath); os.IsNotExist(err) {
+		t.Error("context-check.md artifact should exist")
+	}
+
+	// Verify the change is completed.
+	change, err := changeStore.Load(tmpDir, "add-password-reset-via-email-token")
+	if err != nil {
+		t.Fatalf("load change: %v", err)
+	}
+	if change.Status != changes.StatusCompleted {
+		t.Errorf("status = %q, want completed", change.Status)
 	}
 }

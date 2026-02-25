@@ -78,14 +78,15 @@ func ValidateSize(s ChangeSize) error {
 type ChangeStage string
 
 const (
-	StageDescribe ChangeStage = "describe" // lightweight: what's the change?
-	StageScope    ChangeStage = "scope"    // refactor-specific: what changes, what doesn't
-	StagePropose  ChangeStage = "propose"  // full proposal
-	StageSpec     ChangeStage = "spec"     // requirements/spec for the change
-	StageClarify  ChangeStage = "clarify"  // ambiguity resolution (only for large changes)
-	StageDesign   ChangeStage = "design"   // technical design
-	StageTasks    ChangeStage = "tasks"    // implementation task breakdown
-	StageVerify   ChangeStage = "verify"   // final validation
+	StageDescribe     ChangeStage = "describe"      // lightweight: what's the change?
+	StageScope        ChangeStage = "scope"         // refactor-specific: what changes, what doesn't
+	StagePropose      ChangeStage = "propose"       // full proposal
+	StageContextCheck ChangeStage = "context-check" // scan existing specs/rules for conflicts
+	StageSpec         ChangeStage = "spec"          // requirements/spec for the change
+	StageClarify      ChangeStage = "clarify"       // ambiguity resolution (only for large changes)
+	StageDesign       ChangeStage = "design"        // technical design
+	StageTasks        ChangeStage = "tasks"         // implementation task breakdown
+	StageVerify       ChangeStage = "verify"        // final validation
 )
 
 // --- Change status enum ---

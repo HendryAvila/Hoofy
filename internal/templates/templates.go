@@ -19,6 +19,7 @@ var templateFS embed.FS
 const (
 	Proposal       = "proposal.md.tmpl"
 	Requirements   = "requirements.md.tmpl"
+	BusinessRules  = "business-rules.md.tmpl"
 	Clarifications = "clarifications.md.tmpl"
 	Design         = "design.md.tmpl"
 	Tasks          = "tasks.md.tmpl"
@@ -112,4 +113,14 @@ type TasksData struct {
 	DependencyGraph    string
 	WaveAssignments    string // optional: parallel execution wave groupings
 	AcceptanceCriteria string
+}
+
+// BusinessRulesData holds the data for rendering business rules.
+type BusinessRulesData struct {
+	Name        string
+	Definitions string
+	Facts       string
+	Constraints string
+	Derivations string // optional: computed/inferred knowledge
+	Glossary    string // optional: additional domain vocabulary
 }

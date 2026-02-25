@@ -12,81 +12,81 @@ func TestStageFlow(t *testing.T) {
 		wantFlow []ChangeStage
 		wantErr  bool
 	}{
-		// --- Fix flows ---
+		// --- Fix flows (all include context-check at index 1) ---
 		{
 			name:     "fix/small",
 			cType:    TypeFix,
 			cSize:    SizeSmall,
-			wantFlow: []ChangeStage{StageDescribe, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageDescribe, StageContextCheck, StageTasks, StageVerify},
 		},
 		{
 			name:     "fix/medium",
 			cType:    TypeFix,
 			cSize:    SizeMedium,
-			wantFlow: []ChangeStage{StageDescribe, StageSpec, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageDescribe, StageContextCheck, StageSpec, StageTasks, StageVerify},
 		},
 		{
 			name:     "fix/large",
 			cType:    TypeFix,
 			cSize:    SizeLarge,
-			wantFlow: []ChangeStage{StageDescribe, StageSpec, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageDescribe, StageContextCheck, StageSpec, StageDesign, StageTasks, StageVerify},
 		},
-		// --- Feature flows ---
+		// --- Feature flows (all include context-check at index 1) ---
 		{
 			name:     "feature/small",
 			cType:    TypeFeature,
 			cSize:    SizeSmall,
-			wantFlow: []ChangeStage{StageDescribe, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageDescribe, StageContextCheck, StageTasks, StageVerify},
 		},
 		{
 			name:     "feature/medium",
 			cType:    TypeFeature,
 			cSize:    SizeMedium,
-			wantFlow: []ChangeStage{StagePropose, StageSpec, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
 		},
 		{
 			name:     "feature/large",
 			cType:    TypeFeature,
 			cSize:    SizeLarge,
-			wantFlow: []ChangeStage{StagePropose, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 		},
-		// --- Refactor flows ---
+		// --- Refactor flows (all include context-check at index 1) ---
 		{
 			name:     "refactor/small",
 			cType:    TypeRefactor,
 			cSize:    SizeSmall,
-			wantFlow: []ChangeStage{StageScope, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageScope, StageContextCheck, StageTasks, StageVerify},
 		},
 		{
 			name:     "refactor/medium",
 			cType:    TypeRefactor,
 			cSize:    SizeMedium,
-			wantFlow: []ChangeStage{StageScope, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageScope, StageContextCheck, StageDesign, StageTasks, StageVerify},
 		},
 		{
 			name:     "refactor/large",
 			cType:    TypeRefactor,
 			cSize:    SizeLarge,
-			wantFlow: []ChangeStage{StageScope, StageSpec, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageScope, StageContextCheck, StageSpec, StageDesign, StageTasks, StageVerify},
 		},
-		// --- Enhancement flows ---
+		// --- Enhancement flows (all include context-check at index 1) ---
 		{
 			name:     "enhancement/small",
 			cType:    TypeEnhancement,
 			cSize:    SizeSmall,
-			wantFlow: []ChangeStage{StageDescribe, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageDescribe, StageContextCheck, StageTasks, StageVerify},
 		},
 		{
 			name:     "enhancement/medium",
 			cType:    TypeEnhancement,
 			cSize:    SizeMedium,
-			wantFlow: []ChangeStage{StagePropose, StageSpec, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
 		},
 		{
 			name:     "enhancement/large",
 			cType:    TypeEnhancement,
 			cSize:    SizeLarge,
-			wantFlow: []ChangeStage{StagePropose, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 		},
 		// --- Error cases ---
 		{
@@ -166,6 +166,7 @@ func TestStageFilename(t *testing.T) {
 		{StageDescribe, "describe.md"},
 		{StageScope, "scope.md"},
 		{StagePropose, "propose.md"},
+		{StageContextCheck, "context-check.md"},
 		{StageSpec, "spec.md"},
 		{StageClarify, "clarify.md"},
 		{StageDesign, "design.md"},
@@ -181,5 +182,19 @@ func TestStageFilename(t *testing.T) {
 				t.Errorf("StageFilename(%q) = %q, want %q", tt.stage, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestContextCheckAlwaysSecond(t *testing.T) {
+	for ct, sizes := range FlowRegistry {
+		for cs, flow := range sizes {
+			if len(flow) < 2 {
+				t.Errorf("Flow %s/%s has fewer than 2 stages", ct, cs)
+				continue
+			}
+			if flow[1] != StageContextCheck {
+				t.Errorf("Flow %s/%s: stage[1] = %q, want %q", ct, cs, flow[1], StageContextCheck)
+			}
+		}
 	}
 }
