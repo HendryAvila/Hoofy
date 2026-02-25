@@ -434,6 +434,12 @@ make lint         # golangci-lint
 
 ---
 
+## Acknowledgments
+
+Hoofy's memory system is inspired by [Engram](https://github.com/Gentleman-Programming/engram) by [Gentleman Programming](https://github.com/Gentleman-Programming) — the original persistent memory MCP server that proved AI assistants need long-term context to be truly useful. Engram laid the foundation; Hoofy built on top of it.
+
+---
+
 ## License
 
 [MIT](LICENSE)
