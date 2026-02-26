@@ -30,13 +30,14 @@
     },
     {
       "name": "verify",
-      "status": "in_progress",
-      "started_at": "2026-02-26T19:22:51Z"
+      "status": "completed",
+      "started_at": "2026-02-26T19:22:51Z",
+      "completed_at": "2026-02-26T19:50:06Z"
     }
   ],
   "current_stage": "verify",
   "adrs": [],
-  "status": "active",
+  "status": "completed",
   "created_at": "2026-02-26T19:21:09Z",
-  "updated_at": "2026-02-26T19:22:51Z"
+  "updated_at": "2026-02-26T19:50:06Z"
 }
