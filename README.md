@@ -20,7 +20,6 @@
 
 <p align="center">
   <a href="https://hendrycode.xyz/blog/2026/2/25/hoofy-tu-companion-de-desarrollo-con-ia-que-no-te-deja-cortar-camino/">Blog Post</a> ·
-  <a href="https://hendryavila.github.io/Hoofy/">Interactive Docs</a> ·
   <a href="docs/workflow-guide.md">Workflow Guide</a> ·
   <a href="docs/tool-reference.md">Tool Reference</a> ·
   <a href="docs/research-foundations.md">Research Foundations</a> ·
