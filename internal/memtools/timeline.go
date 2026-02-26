@@ -45,6 +45,9 @@ func (t *TimelineTool) Definition() mcp.Tool {
 			),
 			mcp.Enum(memory.DetailLevelValues()...),
 		),
+		mcp.WithNumber("max_tokens",
+			mcp.Description("Token budget cap. When set, truncates the response to stay within budget. 0 or omit for no cap."),
+		),
 	)
 }
 
@@ -58,6 +61,7 @@ func (t *TimelineTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	before := intArg(req, "before", 5)
 	after := intArg(req, "after", 5)
 	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
+	maxTokens := intArg(req, "max_tokens", 0)
 
 	result, err := t.store.Timeline(int64(obsID), before, after)
 	if err != nil {
@@ -91,7 +95,25 @@ func (t *TimelineTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	b.WriteString(memory.NavigationHint(showing, result.TotalInRange,
 		"Increase before/after to see more context."))
 
-	return mcp.NewToolResultText(b.String()), nil
+	// Apply post-hoc budget truncation if max_tokens is set.
+	response := b.String()
+	if maxTokens > 0 && memory.EstimateTokens(response) > maxTokens {
+		// Truncate at approximate character position (maxTokens * 4 chars/token).
+		charBudget := maxTokens * 4
+		if charBudget < len(response) {
+			response = response[:charBudget]
+			// Find last newline to avoid cutting mid-line.
+			if lastNL := strings.LastIndex(response, "\n"); lastNL > charBudget/2 {
+				response = response[:lastNL]
+			}
+			response += "\n" + memory.BudgetFooter(memory.EstimateTokens(response), maxTokens, showing, result.TotalInRange)
+		}
+	}
+
+	// Always append token footer for context budget visibility.
+	response += memory.TokenFooter(memory.EstimateTokens(response))
+
+	return mcp.NewToolResultText(response), nil
 }
 
 // formatTimelineStandard is the original behavior: 200-char snippets for

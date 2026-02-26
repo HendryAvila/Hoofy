@@ -1774,6 +1774,10 @@ type ContextFormatOptions struct {
 	// Namespace filters observations to a specific sub-agent namespace.
 	// Empty means no namespace filter (see all).
 	Namespace string
+	// MaxTokens sets a token budget cap. When > 0, the response is built
+	// incrementally and stops adding items when the budget would be exceeded.
+	// 0 means no budget cap (default — return everything).
+	MaxTokens int
 }
 
 // FormatContext returns a markdown-formatted summary of recent memory.
@@ -1811,18 +1815,21 @@ func (s *Store) FormatContextDetailed(project, scope string, opts ContextFormatO
 		return "", nil
 	}
 
+	var result string
 	switch detail {
 	case DetailSummary:
-		return s.formatContextSummary(sessions, observations, prompts), nil
+		result = s.formatContextSummary(sessions, observations, prompts, opts.MaxTokens)
 	case DetailFull:
-		return s.formatContextFull(sessions, observations, prompts), nil
+		result = s.formatContextFull(sessions, observations, prompts, opts.MaxTokens)
 	default:
-		return s.formatContextStandard(sessions, observations, prompts), nil
+		result = s.formatContextStandard(sessions, observations, prompts, opts.MaxTokens)
 	}
+	return result, nil
 }
 
 // formatContextStandard is the original behavior — truncated snippets.
-func (s *Store) formatContextStandard(sessions []SessionSummary, observations []Observation, prompts []Prompt) string {
+// When maxTokens > 0, stops adding observations once the budget would be exceeded.
+func (s *Store) formatContextStandard(sessions []SessionSummary, observations []Observation, prompts []Prompt, maxTokens int) string {
 	var b strings.Builder
 	b.WriteString("## Memory from Previous Sessions\n\n")
 
@@ -1849,9 +1856,16 @@ func (s *Store) formatContextStandard(sessions []SessionSummary, observations []
 
 	if len(observations) > 0 {
 		b.WriteString("### Recent Observations\n")
+		shown := 0
 		for _, obs := range observations {
-			fmt.Fprintf(&b, "- [%s] **%s**: %s\n",
+			entry := fmt.Sprintf("- [%s] **%s**: %s\n",
 				obs.Type, obs.Title, Truncate(obs.Content, 300))
+			if maxTokens > 0 && EstimateTokens(b.String()+entry) > maxTokens {
+				b.WriteString(BudgetFooter(EstimateTokens(b.String()), maxTokens, shown, len(observations)))
+				return b.String()
+			}
+			b.WriteString(entry)
+			shown++
 		}
 		b.WriteString("\n")
 	}
@@ -1861,7 +1875,8 @@ func (s *Store) formatContextStandard(sessions []SessionSummary, observations []
 
 // formatContextSummary returns minimal metadata — session names, observation
 // titles, and prompt timestamps. No content snippets. Minimal tokens.
-func (s *Store) formatContextSummary(sessions []SessionSummary, observations []Observation, prompts []Prompt) string {
+// When maxTokens > 0, stops adding observations once the budget would be exceeded.
+func (s *Store) formatContextSummary(sessions []SessionSummary, observations []Observation, prompts []Prompt, maxTokens int) string {
 	var b strings.Builder
 	b.WriteString("## Memory Context (summary)\n\n")
 
@@ -1884,8 +1899,15 @@ func (s *Store) formatContextSummary(sessions []SessionSummary, observations []O
 
 	if len(observations) > 0 {
 		b.WriteString("### Observations\n")
+		shown := 0
 		for _, obs := range observations {
-			fmt.Fprintf(&b, "- #%d [%s] %s\n", obs.ID, obs.Type, obs.Title)
+			entry := fmt.Sprintf("- #%d [%s] %s\n", obs.ID, obs.Type, obs.Title)
+			if maxTokens > 0 && EstimateTokens(b.String()+entry) > maxTokens {
+				b.WriteString(BudgetFooter(EstimateTokens(b.String()), maxTokens, shown, len(observations)))
+				return b.String()
+			}
+			b.WriteString(entry)
+			shown++
 		}
 		b.WriteString("\n")
 	}
@@ -1894,7 +1916,8 @@ func (s *Store) formatContextSummary(sessions []SessionSummary, observations []O
 }
 
 // formatContextFull returns complete untruncated content for deep analysis.
-func (s *Store) formatContextFull(sessions []SessionSummary, observations []Observation, prompts []Prompt) string {
+// When maxTokens > 0, stops adding observations once the budget would be exceeded.
+func (s *Store) formatContextFull(sessions []SessionSummary, observations []Observation, prompts []Prompt, maxTokens int) string {
 	var b strings.Builder
 	b.WriteString("## Memory from Previous Sessions (full)\n\n")
 
@@ -1921,9 +1944,16 @@ func (s *Store) formatContextFull(sessions []SessionSummary, observations []Obse
 
 	if len(observations) > 0 {
 		b.WriteString("### Recent Observations\n")
+		shown := 0
 		for _, obs := range observations {
-			fmt.Fprintf(&b, "#### [%s] %s (ID: %d)\n%s\n\n",
-				obs.Type, obs.Title, obs.ID, obs.Content) // untruncated, with ID
+			entry := fmt.Sprintf("#### [%s] %s (ID: %d)\n%s\n\n",
+				obs.Type, obs.Title, obs.ID, obs.Content)
+			if maxTokens > 0 && EstimateTokens(b.String()+entry) > maxTokens {
+				b.WriteString(BudgetFooter(EstimateTokens(b.String()), maxTokens, shown, len(observations)))
+				return b.String()
+			}
+			b.WriteString(entry)
+			shown++
 		}
 	}
 

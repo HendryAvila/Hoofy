@@ -125,10 +125,10 @@ func TestContextCheckTool_Definition(t *testing.T) {
 		t.Errorf("tool name = %q, want %q", def.Name, "sdd_context_check")
 	}
 
-	// Should have change_description (required), project_name (optional), and detail_level (optional).
+	// Should have change_description (required), project_name (optional), detail_level (optional), and max_tokens (optional).
 	props := def.InputSchema.Properties
-	if len(props) != 3 {
-		t.Errorf("parameter count = %d, want 3", len(props))
+	if len(props) != 4 {
+		t.Errorf("parameter count = %d, want 4", len(props))
 	}
 
 	required := def.InputSchema.Required

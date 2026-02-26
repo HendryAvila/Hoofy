@@ -56,6 +56,9 @@ func (t *ContextCheckTool) Definition() mcp.Tool {
 			),
 			mcp.Enum(memory.DetailLevelValues()...),
 		),
+		mcp.WithNumber("max_tokens",
+			mcp.Description("Token budget cap. When set, truncates the response to stay within budget. 0 or omit for no cap."),
+		),
 	)
 }
 
@@ -87,6 +90,7 @@ func (t *ContextCheckTool) Handle(ctx context.Context, req mcp.CallToolRequest) 
 	changeDesc := strings.TrimSpace(req.GetString("change_description", ""))
 	projectName := req.GetString("project_name", "")
 	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
+	maxTokens := intArgContextCheck(req, "max_tokens", 0)
 
 	if changeDesc == "" {
 		return mcp.NewToolResultError("'change_description' is required — describe the change to check context for"), nil
@@ -198,7 +202,31 @@ func (t *ContextCheckTool) Handle(ctx context.Context, req mcp.CallToolRequest) 
 		sb.WriteString(memory.SummaryFooter)
 	}
 
-	return mcp.NewToolResultText(sb.String()), nil
+	// Apply post-hoc budget truncation and token footer.
+	response := sb.String()
+	if maxTokens > 0 && memory.EstimateTokens(response) > maxTokens {
+		charBudget := maxTokens * 4
+		if charBudget < len(response) {
+			response = response[:charBudget]
+			if lastNL := strings.LastIndex(response, "\n"); lastNL > charBudget/2 {
+				response = response[:lastNL]
+			}
+			response += "\n[...truncated by token budget]"
+		}
+	}
+
+	response += memory.TokenFooter(memory.EstimateTokens(response))
+
+	return mcp.NewToolResultText(response), nil
+}
+
+// intArgContextCheck extracts an integer argument from a tool request (JSON numbers are float64).
+func intArgContextCheck(req mcp.CallToolRequest, key string, defaultVal int) int {
+	v, ok := req.GetArguments()[key].(float64)
+	if !ok {
+		return defaultVal
+	}
+	return int(v)
 }
 
 // --- Private types and helpers ---

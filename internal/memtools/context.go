@@ -44,6 +44,9 @@ func (t *ContextTool) Definition() mcp.Tool {
 		mcp.WithString("namespace",
 			mcp.Description("Optional sub-agent namespace filter (e.g. 'subagent/task-123'). When set, only returns context from this namespace."),
 		),
+		mcp.WithNumber("max_tokens",
+			mcp.Description("Token budget cap. When set, stops adding observations once the budget would be exceeded. 0 or omit for no cap."),
+		),
 	)
 }
 
@@ -54,11 +57,13 @@ func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	limit := intArg(req, "limit", 0)
 	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
 	namespace := req.GetString("namespace", "")
+	maxTokens := intArg(req, "max_tokens", 0)
 
 	formatted, err := t.store.FormatContextDetailed(project, scope, memory.ContextFormatOptions{
 		DetailLevel: detailLevel,
 		Limit:       limit,
 		Namespace:   namespace,
+		MaxTokens:   maxTokens,
 	})
 	if err != nil {
 		return mcp.NewToolResultText("No memory context available."), nil
@@ -88,6 +93,9 @@ func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		formatted += memory.NavigationHint(showing, total,
 			"Use mem_search to find specific memories.")
 	}
+
+	// Always append token footer for context budget visibility.
+	formatted += memory.TokenFooter(memory.EstimateTokens(formatted))
 
 	return mcp.NewToolResultText(formatted), nil
 }

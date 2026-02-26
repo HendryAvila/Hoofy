@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/HendryAvila/Hoofy/internal/config"
+	"github.com/HendryAvila/Hoofy/internal/memory"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -45,6 +46,9 @@ func (t *ContextTool) Definition() mcp.Tool {
 			),
 			mcp.Enum("summary", "standard", "full"),
 		),
+		mcp.WithNumber("max_tokens",
+			mcp.Description("Token budget cap. When set, truncates the response to stay within budget. 0 or omit for no cap."),
+		),
 	)
 }
 
@@ -52,6 +56,7 @@ func (t *ContextTool) Definition() mcp.Tool {
 func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	stageFilter := req.GetString("stage", "")
 	detailLevel := req.GetString("detail_level", "summary")
+	maxTokens := intArgTools(req, "max_tokens", 0)
 
 	projectRoot, err := findProjectRoot()
 	if err != nil {
@@ -65,18 +70,67 @@ func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 
 	// If a specific stage was requested, return its content (detail_level ignored).
 	if stageFilter != "" {
-		return t.readStageContent(cfg, projectRoot, config.Stage(stageFilter))
+		result, stageErr := t.readStageContent(cfg, projectRoot, config.Stage(stageFilter))
+		if stageErr != nil {
+			return nil, stageErr
+		}
+		return applyBudgetAndFooter(result, maxTokens), nil
 	}
 
 	// Route to the appropriate overview builder based on detail level.
+	var result *mcp.CallToolResult
 	switch detailLevel {
 	case "summary":
-		return t.buildSummaryOverview(cfg), nil
+		result = t.buildSummaryOverview(cfg)
 	case "full":
-		return t.buildFullOverview(cfg, projectRoot)
+		result, err = t.buildFullOverview(cfg, projectRoot)
+		if err != nil {
+			return nil, err
+		}
 	default:
-		return t.buildOverview(cfg, projectRoot)
+		result, err = t.buildOverview(cfg, projectRoot)
+		if err != nil {
+			return nil, err
+		}
 	}
+
+	return applyBudgetAndFooter(result, maxTokens), nil
+}
+
+// intArgTools extracts an integer argument from a tool request (JSON numbers are float64).
+func intArgTools(req mcp.CallToolRequest, key string, defaultVal int) int {
+	v, ok := req.GetArguments()[key].(float64)
+	if !ok {
+		return defaultVal
+	}
+	return int(v)
+}
+
+// applyBudgetAndFooter applies post-hoc budget truncation and appends a token footer.
+// Error results are returned as-is (no budget or footer applied).
+func applyBudgetAndFooter(result *mcp.CallToolResult, maxTokens int) *mcp.CallToolResult {
+	if result == nil || result.IsError {
+		return result
+	}
+
+	text := getTextContent(result)
+	if text == "" {
+		return result
+	}
+
+	if maxTokens > 0 && memory.EstimateTokens(text) > maxTokens {
+		charBudget := maxTokens * 4
+		if charBudget < len(text) {
+			text = text[:charBudget]
+			if lastNL := strings.LastIndex(text, "\n"); lastNL > charBudget/2 {
+				text = text[:lastNL]
+			}
+			text += "\n[...truncated by token budget]"
+		}
+	}
+
+	text += memory.TokenFooter(memory.EstimateTokens(text))
+	return mcp.NewToolResultText(text)
 }
 
 // readStageContent returns the markdown content for a specific stage.

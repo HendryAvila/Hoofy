@@ -2233,3 +2233,172 @@ func TestCompactTool_NamespaceDefinitionParam(t *testing.T) {
 		t.Error("mem_compact definition missing 'namespace' parameter")
 	}
 }
+
+// ─── Context Budget Awareness (F6) ─────────────────────────────────────────
+
+func TestContextTool_MaxTokensParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewContextTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["max_tokens"]; !ok {
+		t.Error("mem_context definition missing 'max_tokens' parameter")
+	}
+}
+
+func TestContextTool_TokenFooterAlwaysAppended(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	seedObservation(t, store, "Test obs", "Some content", "my-app")
+
+	tool := NewContextTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project": "my-app",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "📏") {
+		t.Error("response should always contain token footer (📏)")
+	}
+	if !strings.Contains(text, "tokens") {
+		t.Error("response should contain 'tokens' in footer")
+	}
+}
+
+func TestContextTool_MaxTokensBudgetCapping(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+
+	// Seed many large observations to exceed a small budget.
+	for i := 0; i < 10; i++ {
+		seedObservation(t, store,
+			fmt.Sprintf("Observation %d", i),
+			strings.Repeat("Large content block. ", 50), // ~1000 chars each
+			"my-app",
+		)
+	}
+
+	tool := NewContextTool(store)
+
+	// With no budget — should get all observations.
+	rFull, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project": "my-app",
+	}))
+	mustNotError(t, rFull, err)
+	fullText := resultText(rFull)
+
+	// With small budget — should be truncated.
+	rBudget, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":    "my-app",
+		"max_tokens": float64(100), // ~400 chars — very small
+	}))
+	mustNotError(t, rBudget, err)
+	budgetText := resultText(rBudget)
+
+	if len(budgetText) >= len(fullText) {
+		t.Errorf("budget-capped response (%d chars) should be smaller than full response (%d chars)",
+			len(budgetText), len(fullText))
+	}
+
+	if !strings.Contains(budgetText, "⚡") {
+		t.Error("budget-capped response should contain budget footer (⚡)")
+	}
+}
+
+func TestSearchTool_MaxTokensParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewSearchTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["max_tokens"]; !ok {
+		t.Error("mem_search definition missing 'max_tokens' parameter")
+	}
+}
+
+func TestSearchTool_TokenFooterAlwaysAppended(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	seedObservation(t, store, "Auth module", "JWT tokens", "my-app")
+
+	tool := NewSearchTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":   "auth",
+		"project": "my-app",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "📏") {
+		t.Error("search response should always contain token footer (📏)")
+	}
+}
+
+func TestSearchTool_MaxTokensBudgetCapping(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+
+	// Seed observations with searchable content.
+	for i := 0; i < 10; i++ {
+		seedObservation(t, store,
+			fmt.Sprintf("Architecture decision %d", i),
+			strings.Repeat("Architecture details and patterns. ", 30),
+			"my-app",
+		)
+	}
+
+	tool := NewSearchTool(store)
+
+	// Without budget.
+	rFull, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":   "architecture",
+		"project": "my-app",
+	}))
+	mustNotError(t, rFull, err)
+	fullText := resultText(rFull)
+
+	// With small budget.
+	rBudget, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":      "architecture",
+		"project":    "my-app",
+		"max_tokens": float64(50), // very small
+	}))
+	mustNotError(t, rBudget, err)
+	budgetText := resultText(rBudget)
+
+	if len(budgetText) >= len(fullText) {
+		t.Errorf("budget-capped search (%d chars) should be smaller than full search (%d chars)",
+			len(budgetText), len(fullText))
+	}
+
+	if !strings.Contains(budgetText, "⚡") {
+		t.Error("budget-capped search should contain budget footer (⚡)")
+	}
+}
+
+func TestTimelineTool_MaxTokensParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewTimelineTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["max_tokens"]; !ok {
+		t.Error("mem_timeline definition missing 'max_tokens' parameter")
+	}
+}
+
+func TestTimelineTool_TokenFooterAlwaysAppended(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	id := seedObservation(t, store, "Timeline obs", "Some content", "my-app")
+
+	tool := NewTimelineTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(id),
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "📏") {
+		t.Error("timeline response should always contain token footer (📏)")
+	}
+}

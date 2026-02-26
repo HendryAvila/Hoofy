@@ -12,9 +12,9 @@ Persistent context across sessions. SQLite + FTS5 full-text search with a knowle
 |---|---|
 | `mem_save` | Save an observation (decision, bugfix, pattern, discovery, config, architecture). Supports `namespace` for sub-agent isolation |
 | `mem_save_prompt` | Record user intent for future context. Supports `namespace` for sub-agent isolation |
-| `mem_search` | Full-text search across all sessions. Supports `namespace` to filter by sub-agent |
-| `mem_context` | Recent observations for session startup. Supports `namespace` to filter by sub-agent |
-| `mem_timeline` | Chronological context around a specific event |
+| `mem_search` | Full-text search across all sessions. Supports `namespace` to filter by sub-agent. Supports `max_tokens` to cap response size |
+| `mem_context` | Recent observations for session startup. Supports `namespace` to filter by sub-agent. Supports `max_tokens` to cap response size |
+| `mem_timeline` | Chronological context around a specific event. Supports `max_tokens` to cap response size |
 | `mem_get_observation` | Full content of a specific observation (includes direct relations) |
 | `mem_relate` | Create a typed directional relation between two observations (`relates_to`, `depends_on`, `caused_by`, `implements`, `supersedes`, `part_of`) |
 | `mem_unrelate` | Remove a relation by relation ID |
@@ -38,7 +38,7 @@ Adaptive workflow for ongoing development. Includes `sdd_explore` for pre-pipeli
 |---|---|
 | `sdd_explore` | Pre-pipeline context capture — saves goals, constraints, tech preferences, unknowns, and decisions to memory. Upserts via topic key (call multiple times as thinking evolves). Suggests change type/size based on keywords. Use before `sdd_change` or `sdd_init_project`. |
 | `sdd_change` | Create a new change (feature, fix, refactor, enhancement) with size (small, medium, large) |
-| `sdd_context_check` | Mandatory conflict scanner — scans existing specs, completed changes, memory observations, and convention files (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, etc.) for ambiguities and conflicts. Runs as the first stage in every change flow. Zero issues = advance. Issues found = must resolve. |
+| `sdd_context_check` | Mandatory conflict scanner — scans existing specs, completed changes, memory observations, and convention files (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, etc.) for ambiguities and conflicts. Runs as the first stage in every change flow. Zero issues = advance. Issues found = must resolve. Supports `max_tokens` to cap response size |
 | `sdd_change_advance` | Save stage content and advance to next stage |
 | `sdd_change_status` | View current change status, stage progress, and artifacts |
 | `sdd_adr` | Capture Architecture Decision Records (context, decision, rationale, rejected alternatives) |
@@ -57,7 +57,7 @@ Full greenfield specification — from vague idea to validated architecture. Now
 | `sdd_create_design` | Save technical architecture (components, data model, APIs, security) |
 | `sdd_create_tasks` | Save implementation task breakdown with dependency graph and optional wave assignments for parallel execution |
 | `sdd_validate` | Cross-artifact consistency check (requirements ↔ design ↔ tasks) |
-| `sdd_get_context` | View project state, pipeline status, and stage artifacts |
+| `sdd_get_context` | View project state, pipeline status, and stage artifacts. Supports `max_tokens` to cap response size |
 
 ## Prompts
 

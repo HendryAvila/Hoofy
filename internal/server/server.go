@@ -606,6 +606,35 @@ sub-agent its own progress document.
 **mem_timeline does NOT support namespace**: Timeline is inherently ID-scoped
 (centered on a specific observation_id), so namespace filtering is unnecessary.
 
+### Context Budget Awareness (max_tokens parameter)
+
+Five read-heavy tools accept an optional max_tokens integer parameter that caps response
+size by estimated token count. Use this when context window space is limited or when
+you need to fit a response within a specific token budget.
+
+**How it works**:
+- Token estimation uses len(text)/4 heuristic (fast O(1), no tokenizer dependency)
+- When max_tokens is set, the response is capped at approximately that many tokens
+- Every response from these tools includes a "📏 ~N tokens" footer showing estimated size
+- When a response is budget-capped, a "⚡ Budget-capped" notice is prepended to the footer
+
+**Tools that support max_tokens**:
+- mem_context: Incremental build — stops adding observations when budget would be exceeded
+- mem_search: Incremental build — stops adding results when budget would be exceeded
+- mem_timeline: Post-hoc truncation — builds full response, then truncates to budget
+- sdd_get_context: Post-hoc truncation — builds full response, then truncates to budget
+- sdd_context_check: Post-hoc truncation — builds full response, then truncates to budget
+
+**When to use max_tokens**:
+- When you know your remaining context window budget and want to stay within it
+- When fetching context for a sub-agent with a smaller context window
+- When you need a quick overview and want to cap verbosity beyond what detail_level provides
+
+**max_tokens vs detail_level**: These are complementary:
+- detail_level controls WHAT is included (summary vs standard vs full content)
+- max_tokens controls HOW MUCH total output, regardless of detail level
+- Use detail_level first to control content type, then max_tokens as a hard cap if needed
+
 ### Knowledge Graph (Relations)
 
 Observations can be connected with typed, directional relations to form a knowledge graph.

@@ -53,6 +53,9 @@ func (t *SearchTool) Definition() mcp.Tool {
 		mcp.WithString("namespace",
 			mcp.Description("Optional sub-agent namespace filter (e.g. 'subagent/task-123'). When set, only returns memories from this namespace."),
 		),
+		mcp.WithNumber("max_tokens",
+			mcp.Description("Token budget cap. When set, stops adding results once the budget would be exceeded. 0 or omit for no cap."),
+		),
 	)
 }
 
@@ -69,6 +72,7 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	limit := intArg(req, "limit", 10)
 	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
 	namespace := req.GetString("namespace", "")
+	maxTokens := intArg(req, "max_tokens", 0)
 
 	results, err := t.store.Search(query, memory.SearchOptions{
 		Type:      typ,
@@ -88,6 +92,7 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	var b strings.Builder
 	fmt.Fprintf(&b, "Found %d memories:\n\n", len(results))
 
+	shown := 0
 	for i, r := range results {
 		projectStr := ""
 		if r.Project != nil {
@@ -98,15 +103,14 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 			topicInfo = fmt.Sprintf(" | topic: %s", *r.TopicKey)
 		}
 
+		var entry string
 		switch detailLevel {
 		case memory.DetailSummary:
-			// Minimal: ID, type, title only — no content
-			fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n",
+			entry = fmt.Sprintf("[%d] #%d (%s) - %s\n",
 				i+1, r.ID, r.Type, r.Title)
 
 		case memory.DetailFull:
-			// Complete untruncated content
-			fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
+			entry = fmt.Sprintf("[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
 				i+1, r.ID, r.Type, r.Title,
 				r.Content,
 				projectStr, topicInfo, r.Scope,
@@ -114,12 +118,21 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 
 		default: // standard
 			snippet := memory.Truncate(r.Content, 300)
-			fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
+			entry = fmt.Sprintf("[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
 				i+1, r.ID, r.Type, r.Title,
 				snippet,
 				projectStr, topicInfo, r.Scope,
 			)
 		}
+
+		if maxTokens > 0 && memory.EstimateTokens(b.String()+entry) > maxTokens {
+			b.WriteString(memory.BudgetFooter(memory.EstimateTokens(b.String()), maxTokens, shown, len(results)))
+			b.WriteString(memory.TokenFooter(memory.EstimateTokens(b.String())))
+			return mcp.NewToolResultText(b.String()), nil
+		}
+
+		b.WriteString(entry)
+		shown++
 	}
 
 	// Append footer hint for summary mode.
@@ -138,6 +151,9 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		b.WriteString(memory.NavigationHint(len(results), total,
 			"Use mem_get_observation #ID for full content."))
 	}
+
+	// Always append token footer for context budget visibility.
+	b.WriteString(memory.TokenFooter(memory.EstimateTokens(b.String())))
 
 	return mcp.NewToolResultText(b.String()), nil
 }
