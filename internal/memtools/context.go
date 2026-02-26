@@ -33,6 +33,14 @@ func (t *ContextTool) Definition() mcp.Tool {
 		mcp.WithNumber("limit",
 			mcp.Description("Number of observations to retrieve (default: 20)"),
 		),
+		mcp.WithString("detail_level",
+			mcp.Description(
+				"Level of detail: 'summary' (titles and metadata only — minimal tokens), "+
+					"'standard' (default — truncated content snippets), "+
+					"'full' (complete untruncated content for deep analysis).",
+			),
+			mcp.Enum(memory.DetailLevelValues()...),
+		),
 	)
 }
 
@@ -40,14 +48,24 @@ func (t *ContextTool) Definition() mcp.Tool {
 func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	project := req.GetString("project", "")
 	scope := req.GetString("scope", "")
+	limit := intArg(req, "limit", 0)
+	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
 
-	formatted, err := t.store.FormatContext(project, scope)
+	formatted, err := t.store.FormatContextDetailed(project, scope, memory.ContextFormatOptions{
+		DetailLevel: detailLevel,
+		Limit:       limit,
+	})
 	if err != nil {
 		return mcp.NewToolResultText("No memory context available."), nil
 	}
 
 	if formatted == "" {
 		return mcp.NewToolResultText("No memory context available yet. Start saving observations with mem_save."), nil
+	}
+
+	// Append footer hint for summary mode.
+	if detailLevel == memory.DetailSummary {
+		formatted += memory.SummaryFooter
 	}
 
 	return mcp.NewToolResultText(formatted), nil

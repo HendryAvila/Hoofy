@@ -42,6 +42,14 @@ func (t *SearchTool) Definition() mcp.Tool {
 		mcp.WithNumber("limit",
 			mcp.Description("Max results (default: 10, max: 20)"),
 		),
+		mcp.WithString("detail_level",
+			mcp.Description(
+				"Level of detail: 'summary' (IDs, types, and titles only — minimal tokens), "+
+					"'standard' (default — 300-char content snippets), "+
+					"'full' (complete untruncated content per result).",
+			),
+			mcp.Enum(memory.DetailLevelValues()...),
+		),
 	)
 }
 
@@ -56,6 +64,7 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	project := req.GetString("project", "")
 	scope := req.GetString("scope", "")
 	limit := intArg(req, "limit", 10)
+	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
 
 	results, err := t.store.Search(query, memory.SearchOptions{
 		Type:    typ,
@@ -75,22 +84,42 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	fmt.Fprintf(&b, "Found %d memories:\n\n", len(results))
 
 	for i, r := range results {
-		project := ""
+		projectStr := ""
 		if r.Project != nil {
-			project = *r.Project
+			projectStr = *r.Project
 		}
 		topicInfo := ""
 		if r.TopicKey != nil && *r.TopicKey != "" {
 			topicInfo = fmt.Sprintf(" | topic: %s", *r.TopicKey)
 		}
 
-		snippet := memory.Truncate(r.Content, 300)
+		switch detailLevel {
+		case memory.DetailSummary:
+			// Minimal: ID, type, title only — no content
+			fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n",
+				i+1, r.ID, r.Type, r.Title)
 
-		fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
-			i+1, r.ID, r.Type, r.Title,
-			snippet,
-			project, topicInfo, r.Scope,
-		)
+		case memory.DetailFull:
+			// Complete untruncated content
+			fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
+				i+1, r.ID, r.Type, r.Title,
+				r.Content,
+				projectStr, topicInfo, r.Scope,
+			)
+
+		default: // standard
+			snippet := memory.Truncate(r.Content, 300)
+			fmt.Fprintf(&b, "[%d] #%d (%s) - %s\n    %s\n    %s%s | scope: %s\n\n",
+				i+1, r.ID, r.Type, r.Title,
+				snippet,
+				projectStr, topicInfo, r.Scope,
+			)
+		}
+	}
+
+	// Append footer hint for summary mode.
+	if detailLevel == memory.DetailSummary {
+		b.WriteString(memory.SummaryFooter)
 	}
 
 	return mcp.NewToolResultText(b.String()), nil

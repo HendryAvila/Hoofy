@@ -353,6 +353,302 @@ func TestContextTool_WithData(t *testing.T) {
 	}
 }
 
+func TestContextTool_SummaryLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	seedObservation(t, store, "Added auth", "Auth module with JWT tokens and bcrypt hashing", "my-app")
+
+	tool := NewContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":      "my-app",
+		"detail_level": "summary",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Summary should have title but NOT content snippets
+	if !strings.Contains(text, "Added auth") {
+		t.Errorf("expected observation title, got: %s", text)
+	}
+	if strings.Contains(text, "JWT tokens") {
+		t.Errorf("summary should NOT contain content snippets, got: %s", text)
+	}
+	// Should have footer hint
+	if !strings.Contains(text, "detail_level") {
+		t.Errorf("expected footer hint about detail_level, got: %s", text)
+	}
+}
+
+func TestContextTool_FullLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	longContent := strings.Repeat("This is detailed content. ", 50) // 1300+ chars
+	seedObservation(t, store, "Big observation", longContent, "my-app")
+
+	tool := NewContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":      "my-app",
+		"detail_level": "full",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Full mode should NOT truncate — all repeated blocks should be present
+	// Standard mode truncates to 300 chars (~11 repetitions), full should have all 50
+	lastChunk := "This is detailed content. This is detailed content. This is detailed content. "
+	if !strings.Contains(text, lastChunk) {
+		t.Errorf("full mode should contain untruncated content")
+	}
+	// Verify it's truly untruncated — check there are no truncation markers
+	if strings.Contains(text, "...") {
+		t.Errorf("full mode should NOT contain truncation markers, got: %s", text[:500])
+	}
+	// Should NOT have footer hint
+	if strings.Contains(text, "💡") {
+		t.Errorf("full mode should NOT have footer hint")
+	}
+}
+
+func TestContextTool_StandardLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	longContent := strings.Repeat("Standard content block. ", 50)
+	seedObservation(t, store, "Standard obs", longContent, "my-app")
+
+	tool := NewContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":      "my-app",
+		"detail_level": "standard",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Standard should truncate content
+	if strings.Contains(text, longContent) {
+		t.Errorf("standard mode should truncate long content")
+	}
+	if !strings.Contains(text, "Standard content block") {
+		t.Errorf("standard mode should contain beginning of content, got: %s", text)
+	}
+}
+
+func TestContextTool_LimitParam(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	seedObservation(t, store, "First obs", "First content", "my-app")
+	seedObservation(t, store, "Second obs", "Second content", "my-app")
+	seedObservation(t, store, "Third obs", "Third content", "my-app")
+
+	tool := NewContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project": "my-app",
+		"limit":   float64(1),
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// With limit=1, we should see at most 1 observation
+	// Count observation entries (each starts with "- [manual]")
+	count := strings.Count(text, "[manual]")
+	if count > 1 {
+		t.Errorf("expected at most 1 observation with limit=1, got %d occurrences", count)
+	}
+}
+
+// ─── SearchTool detail_level ─────────────────────────────────────────────────
+
+func TestSearchTool_SummaryLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	seedObservation(t, store, "JWT middleware", "Added JWT auth middleware with bcrypt and refresh tokens", "my-app")
+
+	tool := NewSearchTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":        "JWT auth",
+		"detail_level": "summary",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Summary should have title but NOT content snippets
+	if !strings.Contains(text, "JWT middleware") {
+		t.Errorf("summary should contain title, got: %s", text)
+	}
+	if strings.Contains(text, "bcrypt") {
+		t.Errorf("summary should NOT contain content details, got: %s", text)
+	}
+	// Should have footer hint
+	if !strings.Contains(text, "detail_level") {
+		t.Errorf("summary should have footer hint, got: %s", text)
+	}
+}
+
+func TestSearchTool_FullLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	longContent := strings.Repeat("Detailed search content. ", 50) // 1250+ chars
+	seedObservation(t, store, "Big search result", longContent, "my-app")
+
+	tool := NewSearchTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":        "search content",
+		"detail_level": "full",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Full mode should contain much more content than the 300-char standard truncation.
+	// The content is 1250+ chars — check that at least 800 chars appear (well beyond
+	// the 300-char standard cutoff), proving full mode doesn't truncate.
+	contentInResult := strings.Count(text, "Detailed search content.")
+	if contentInResult < 30 {
+		t.Errorf("full mode should contain most/all repetitions (got %d, want >= 30 of 50)", contentInResult)
+	}
+	// Should NOT have footer hint
+	if strings.Contains(text, "💡") {
+		t.Errorf("full mode should NOT have footer hint")
+	}
+}
+
+func TestSearchTool_StandardLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+	longContent := strings.Repeat("Standard search block. ", 50)
+	seedObservation(t, store, "Standard search obs", longContent, "my-app")
+
+	tool := NewSearchTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":        "search block",
+		"detail_level": "standard",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Standard should truncate content (300 chars max snippet)
+	if strings.Contains(text, longContent) {
+		t.Errorf("standard mode should truncate long content")
+	}
+	if !strings.Contains(text, "Standard search block") {
+		t.Errorf("standard mode should contain beginning of content, got: %s", text)
+	}
+}
+
+// ─── TimelineTool detail_level ──────────────────────────────────────────────
+
+func TestTimelineTool_SummaryLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+
+	seedObservation(t, store, "Before obs", "Before observation detailed content", "my-app")
+	id2 := seedObservation(t, store, "Focus obs", "Focus observation detailed content", "my-app")
+	seedObservation(t, store, "After obs", "After observation detailed content", "my-app")
+
+	tool := NewTimelineTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(id2),
+		"before":         float64(5),
+		"after":          float64(5),
+		"detail_level":   "summary",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Summary should have titles but NOT content
+	if !strings.Contains(text, "Focus obs") {
+		t.Errorf("summary should contain focus title, got: %s", text)
+	}
+	if strings.Contains(text, "detailed content") {
+		t.Errorf("summary should NOT contain observation content, got: %s", text)
+	}
+	// Should have footer hint
+	if !strings.Contains(text, "detail_level") {
+		t.Errorf("summary should have footer hint, got: %s", text)
+	}
+}
+
+func TestTimelineTool_FullLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+
+	longContent := strings.Repeat("Before content block. ", 30) // 660+ chars
+	seedObservation(t, store, "Before full", longContent, "my-app")
+	id2 := seedObservation(t, store, "Focus full", "Focus full content", "my-app")
+	seedObservation(t, store, "After full", "After full content", "my-app")
+
+	tool := NewTimelineTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(id2),
+		"before":         float64(5),
+		"after":          float64(5),
+		"detail_level":   "full",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Full mode should contain much more content than the 200-char standard truncation.
+	// The before content is 660+ chars — count repetitions to verify it's untruncated.
+	contentInResult := strings.Count(text, "Before content block.")
+	if contentInResult < 20 {
+		t.Errorf("full mode should contain most/all before content repetitions (got %d, want >= 20 of 30)", contentInResult)
+	}
+	if !strings.Contains(text, "Focus full content") {
+		t.Errorf("full mode should contain focus content")
+	}
+	// Should NOT have footer hint
+	if strings.Contains(text, "💡") {
+		t.Errorf("full mode should NOT have footer hint")
+	}
+}
+
+func TestTimelineTool_StandardLevel(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "my-app")
+
+	longContent := strings.Repeat("Standard timeline block. ", 30) // 720+ chars
+	seedObservation(t, store, "Before std", longContent, "my-app")
+	id2 := seedObservation(t, store, "Focus std", "Focus standard content here", "my-app")
+	seedObservation(t, store, "After std", "After standard content", "my-app")
+
+	tool := NewTimelineTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(id2),
+		"before":         float64(5),
+		"after":          float64(5),
+		"detail_level":   "standard",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	// Standard should truncate before/after but show full focus
+	if strings.Contains(text, longContent) {
+		t.Errorf("standard mode should truncate long before content")
+	}
+	// Focus content should be shown in full (standard behavior)
+	if !strings.Contains(text, "Focus standard content here") {
+		t.Errorf("standard mode should show full focus content, got: %s", text)
+	}
+}
+
 // ─── SessionStartTool ────────────────────────────────────────────────────────
 
 func TestSessionStartTool_Success(t *testing.T) {

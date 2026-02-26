@@ -1469,14 +1469,38 @@ func (s *Store) Stats() (*Stats, error) {
 
 // ─── Context Formatting ─────────────────────────────────────────────────────
 
+// ContextFormatOptions controls verbosity and limits for FormatContextDetailed.
+type ContextFormatOptions struct {
+	// DetailLevel controls verbosity: "summary", "standard", or "full".
+	// Defaults to "standard" if empty.
+	DetailLevel string
+	// Limit overrides the number of observations to retrieve.
+	// 0 means use the configured default (MaxContextResults).
+	Limit int
+}
+
 // FormatContext returns a markdown-formatted summary of recent memory.
+// This is the backward-compatible wrapper that always uses standard detail.
 func (s *Store) FormatContext(project, scope string) (string, error) {
+	return s.FormatContextDetailed(project, scope, ContextFormatOptions{})
+}
+
+// FormatContextDetailed returns a markdown-formatted summary of recent memory
+// with configurable verbosity (summary/standard/full) and observation limit.
+func (s *Store) FormatContextDetailed(project, scope string, opts ContextFormatOptions) (string, error) {
+	detail := ParseDetailLevel(opts.DetailLevel)
+
+	obsLimit := s.cfg.MaxContextResults
+	if opts.Limit > 0 {
+		obsLimit = opts.Limit
+	}
+
 	sessions, err := s.RecentSessions(project, 5)
 	if err != nil {
 		return "", err
 	}
 
-	observations, err := s.RecentObservations(project, scope, s.cfg.MaxContextResults)
+	observations, err := s.RecentObservations(project, scope, obsLimit)
 	if err != nil {
 		return "", err
 	}
@@ -1490,6 +1514,18 @@ func (s *Store) FormatContext(project, scope string) (string, error) {
 		return "", nil
 	}
 
+	switch detail {
+	case DetailSummary:
+		return s.formatContextSummary(sessions, observations, prompts), nil
+	case DetailFull:
+		return s.formatContextFull(sessions, observations, prompts), nil
+	default:
+		return s.formatContextStandard(sessions, observations, prompts), nil
+	}
+}
+
+// formatContextStandard is the original behavior — truncated snippets.
+func (s *Store) formatContextStandard(sessions []SessionSummary, observations []Observation, prompts []Prompt) string {
 	var b strings.Builder
 	b.WriteString("## Memory from Previous Sessions\n\n")
 
@@ -1523,7 +1559,78 @@ func (s *Store) FormatContext(project, scope string) (string, error) {
 		b.WriteString("\n")
 	}
 
-	return b.String(), nil
+	return b.String()
+}
+
+// formatContextSummary returns minimal metadata — session names, observation
+// titles, and prompt timestamps. No content snippets. Minimal tokens.
+func (s *Store) formatContextSummary(sessions []SessionSummary, observations []Observation, prompts []Prompt) string {
+	var b strings.Builder
+	b.WriteString("## Memory Context (summary)\n\n")
+
+	if len(sessions) > 0 {
+		b.WriteString("### Sessions\n")
+		for _, sess := range sessions {
+			fmt.Fprintf(&b, "- %s (%s) [%d obs]\n",
+				sess.Project, sess.StartedAt, sess.ObservationCount)
+		}
+		b.WriteString("\n")
+	}
+
+	if len(prompts) > 0 {
+		b.WriteString("### Prompts\n")
+		for _, p := range prompts {
+			fmt.Fprintf(&b, "- %s: %s\n", p.CreatedAt, Truncate(p.Content, 80))
+		}
+		b.WriteString("\n")
+	}
+
+	if len(observations) > 0 {
+		b.WriteString("### Observations\n")
+		for _, obs := range observations {
+			fmt.Fprintf(&b, "- #%d [%s] %s\n", obs.ID, obs.Type, obs.Title)
+		}
+		b.WriteString("\n")
+	}
+
+	return b.String()
+}
+
+// formatContextFull returns complete untruncated content for deep analysis.
+func (s *Store) formatContextFull(sessions []SessionSummary, observations []Observation, prompts []Prompt) string {
+	var b strings.Builder
+	b.WriteString("## Memory from Previous Sessions (full)\n\n")
+
+	if len(sessions) > 0 {
+		b.WriteString("### Recent Sessions\n")
+		for _, sess := range sessions {
+			summary := ""
+			if sess.Summary != nil {
+				summary = fmt.Sprintf(": %s", *sess.Summary) // untruncated
+			}
+			fmt.Fprintf(&b, "- **%s** (%s)%s [%d observations]\n",
+				sess.Project, sess.StartedAt, summary, sess.ObservationCount)
+		}
+		b.WriteString("\n")
+	}
+
+	if len(prompts) > 0 {
+		b.WriteString("### Recent User Prompts\n")
+		for _, p := range prompts {
+			fmt.Fprintf(&b, "- %s: %s\n", p.CreatedAt, p.Content) // untruncated
+		}
+		b.WriteString("\n")
+	}
+
+	if len(observations) > 0 {
+		b.WriteString("### Recent Observations\n")
+		for _, obs := range observations {
+			fmt.Fprintf(&b, "#### [%s] %s (ID: %d)\n%s\n\n",
+				obs.Type, obs.Title, obs.ID, obs.Content) // untruncated, with ID
+		}
+	}
+
+	return b.String()
 }
 
 // ─── Export / Import ─────────────────────────────────────────────────────────

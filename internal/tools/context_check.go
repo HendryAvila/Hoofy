@@ -48,6 +48,14 @@ func (t *ContextCheckTool) Definition() mcp.Tool {
 			mcp.Description("Project name for filtering memory search results. "+
 				"Optional — if omitted, memory search is unfiltered."),
 		),
+		mcp.WithString("detail_level",
+			mcp.Description(
+				"Level of detail: 'summary' (filenames, sizes, and slugs only — minimal tokens), "+
+					"'standard' (default — truncated excerpts of artifacts and memory), "+
+					"'full' (complete untruncated artifact content and memory results).",
+			),
+			mcp.Enum(memory.DetailLevelValues()...),
+		),
 	)
 }
 
@@ -78,6 +86,7 @@ const maxMemoryResults = 5
 func (t *ContextCheckTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	changeDesc := strings.TrimSpace(req.GetString("change_description", ""))
 	projectName := req.GetString("project_name", "")
+	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
 
 	if changeDesc == "" {
 		return mcp.NewToolResultError("'change_description' is required — describe the change to check context for"), nil
@@ -130,7 +139,14 @@ func (t *ContextCheckTool) Handle(ctx context.Context, req mcp.CallToolRequest) 
 			fmt.Fprintf(&sb, "_Memory search failed: %v_\n", searchErr)
 		} else if len(results) > 0 {
 			for _, r := range results {
-				fmt.Fprintf(&sb, "- **%s** (ID: %d): %s\n", r.Title, r.ID, truncateContent(r.Content, 200))
+				switch detailLevel {
+				case memory.DetailSummary:
+					fmt.Fprintf(&sb, "- **%s** (ID: %d)\n", r.Title, r.ID)
+				case memory.DetailFull:
+					fmt.Fprintf(&sb, "- **%s** (ID: %d): %s\n", r.Title, r.ID, r.Content)
+				default:
+					fmt.Fprintf(&sb, "- **%s** (ID: %d): %s\n", r.Title, r.ID, truncateContent(r.Content, 200))
+				}
 			}
 		} else {
 			sb.WriteString("_No explore observations found._\n")
@@ -147,7 +163,14 @@ func (t *ContextCheckTool) Handle(ctx context.Context, req mcp.CallToolRequest) 
 		if len(conventions) > 0 {
 			sb.WriteString("_No formal SDD specs found. Scanning project conventions:_\n\n")
 			for _, c := range conventions {
-				fmt.Fprintf(&sb, "### %s\n\n```\n%s\n```\n\n", c.name, c.content)
+				switch detailLevel {
+				case memory.DetailSummary:
+					fmt.Fprintf(&sb, "- %s\n", c.name)
+				case memory.DetailFull:
+					fmt.Fprintf(&sb, "### %s\n\n```\n%s\n```\n\n", c.name, c.content)
+				default:
+					fmt.Fprintf(&sb, "### %s\n\n```\n%s\n```\n\n", c.name, c.content)
+				}
 			}
 		} else {
 			sb.WriteString("_No convention files found._\n")
@@ -158,11 +181,21 @@ func (t *ContextCheckTool) Handle(ctx context.Context, req mcp.CallToolRequest) 
 	sb.WriteString("\n")
 
 	// --- Section 5: Artifact content excerpts ---
-	if hasArtifacts {
+	if hasArtifacts && detailLevel != memory.DetailSummary {
 		sb.WriteString("## Artifact Excerpts\n\n")
 		for _, a := range artifacts {
-			fmt.Fprintf(&sb, "### %s\n\n%s\n\n", a.name, truncateContent(a.content, 500))
+			switch detailLevel {
+			case memory.DetailFull:
+				fmt.Fprintf(&sb, "### %s\n\n%s\n\n", a.name, a.content)
+			default:
+				fmt.Fprintf(&sb, "### %s\n\n%s\n\n", a.name, truncateContent(a.content, 500))
+			}
 		}
+	}
+
+	// Append footer hint for summary mode.
+	if detailLevel == memory.DetailSummary {
+		sb.WriteString(memory.SummaryFooter)
 	}
 
 	return mcp.NewToolResultText(sb.String()), nil

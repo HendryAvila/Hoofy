@@ -22,6 +22,7 @@
   <a href="https://hendrycode.xyz/blog/2026/2/25/hoofy-tu-companion-de-desarrollo-con-ia-que-no-te-deja-cortar-camino/">Blog Post</a> ·
   <a href="docs/workflow-guide.md">Workflow Guide</a> ·
   <a href="docs/tool-reference.md">Tool Reference</a> ·
+  <a href="docs/research-foundations.md">Research Foundations</a> ·
   <a href="https://news.ycombinator.com/item?id=47158567">Hacker News</a>
 </p>
 
@@ -403,23 +404,25 @@ Plan Mode (Implementation)  →  "HOW do we build it? Which files?"
 
 ## The Research Behind SDD
 
-Hoofy's specification pipeline isn't built on opinions. It's built on research:
+Hoofy's specification pipeline isn't built on opinions. It's built on research. Every feature maps to a specific recommendation from Anthropic Engineering or industry research — see the **[full research foundations document](docs/research-foundations.md)** for the complete mapping.
 
+**Anthropic Engineering:**
+- [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents) — ACI design, tool patterns, orchestrator-worker architecture
+- [Effective Context Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) — Persistent memory, progressive disclosure, context as finite resource
+- [Writing Effective Tools](https://www.anthropic.com/engineering/writing-tools-for-agents) — Tool namespacing, response design, token efficiency
+- [Multi-Agent Research System](https://www.anthropic.com/engineering/multi-agent-research-system) — Session summaries, filesystem output, token budget awareness
+- [Long-Running Agent Harnesses](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents) — Progress tracking, incremental delivery, JSON over Markdown for state
+- [Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices) — CLAUDE.md scanning, structured workflows
+
+**Industry Research:**
 - **METR 2025**: Experienced developers were [19% slower with AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) despite feeling 20% faster — unstructured AI usage introduces debugging overhead and false confidence.
-
 - **DORA 2025**: [7.2% delivery instability increase](https://dora.dev/research/2025/dora-report/) for every 25% AI adoption — without foundational systems and practices.
-
 - **McKinsey 2025**: Top performers see [16-30% productivity gains](https://www.mckinsey.com/capabilities/mckinsey-digital/our-insights/superagency-in-the-workplace-empowering-people-to-unlock-ais-full-potential-at-work) only with structured specification and communication.
-
-- **IEEE Requirements Engineering**: Fixing a requirement error in production costs [10-100x more](https://ieeexplore.ieee.org/document/720574) than fixing it during requirements. This multiplier is worse with AI-generated code.
-
-- **IREB & IEEE 29148**: Industry standards for requirements engineering — structured elicitation, traceability, and ambiguity detection. Hoofy's Clarity Gate and server instructions implement frameworks from these standards.
-
-- **Business Rules Group (BRG)**: The [Business Rules Manifesto](https://www.businessrulesgroup.org/brmanifesto.htm) establishes that rules are first-class citizens, not buried in code. Hoofy's business-rules stage uses BRG taxonomy (Definitions, Facts, Constraints, Derivations) to extract declarative rules.
-
-- **EARS (Easy Approach to Requirements Syntax)**: Research-backed sentence templates that eliminate ambiguity in natural-language requirements. Hoofy's server instructions use EARS patterns for the AI to follow.
-
-- **DDD Ubiquitous Language**: Domain-Driven Design's principle that a shared language eliminates translation errors. Hoofy's business-rules stage builds a glossary as part of the Ubiquitous Language.
+- **IEEE 720574**: Fixing a requirement error in production costs [10-100x more](https://ieeexplore.ieee.org/document/720574) than fixing it during requirements — worse with AI-generated code.
+- **IREB & IEEE 29148**: Structured elicitation, traceability, ambiguity detection — Hoofy's Clarity Gate implements these frameworks.
+- **Business Rules Group**: The [Business Rules Manifesto](https://www.businessrulesgroup.org/brmanifesto.htm) — rules as first-class citizens. Hoofy uses BRG taxonomy.
+- **EARS**: [Research-backed sentence templates](https://alistairmavin.com/ears/) that eliminate requirements ambiguity.
+- **DDD Ubiquitous Language**: [Shared language](https://martinfowler.com/bliki/UbiquitousLanguage.html) eliminates translation errors — Hoofy's business-rules glossary.
 
 **Structure beats speed.**
 

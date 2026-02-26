@@ -37,6 +37,14 @@ func (t *TimelineTool) Definition() mcp.Tool {
 		mcp.WithNumber("after",
 			mcp.Description("Number of observations to show after the focus (default: 5)"),
 		),
+		mcp.WithString("detail_level",
+			mcp.Description(
+				"Level of detail: 'summary' (titles and timestamps only — minimal tokens), "+
+					"'standard' (default — 200-char snippets for before/after, full content for focus), "+
+					"'full' (complete untruncated content for ALL entries).",
+			),
+			mcp.Enum(memory.DetailLevelValues()...),
+		),
 	)
 }
 
@@ -49,6 +57,7 @@ func (t *TimelineTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 
 	before := intArg(req, "before", 5)
 	after := intArg(req, "after", 5)
+	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
 
 	result, err := t.store.Timeline(int64(obsID), before, after)
 	if err != nil {
@@ -63,30 +72,86 @@ func (t *TimelineTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 		fmt.Fprintf(&b, "Total observations in session: %d\n\n", result.TotalInRange)
 	}
 
-	// Before entries
+	switch detailLevel {
+	case memory.DetailSummary:
+		t.formatTimelineSummary(&b, result)
+	case memory.DetailFull:
+		t.formatTimelineFull(&b, result)
+	default:
+		t.formatTimelineStandard(&b, result)
+	}
+
+	// Append footer hint for summary mode.
+	if detailLevel == memory.DetailSummary {
+		b.WriteString(memory.SummaryFooter)
+	}
+
+	return mcp.NewToolResultText(b.String()), nil
+}
+
+// formatTimelineStandard is the original behavior: 200-char snippets for
+// before/after entries, full content for the focus observation.
+func (t *TimelineTool) formatTimelineStandard(b *strings.Builder, result *memory.TimelineResult) {
 	if len(result.Before) > 0 {
 		b.WriteString("--- Before ---\n")
 		for _, e := range result.Before {
 			snippet := memory.Truncate(e.Content, 200)
-			fmt.Fprintf(&b, "#%d [%s] %s: %s\n", e.ID, e.Type, e.Title, snippet)
+			fmt.Fprintf(b, "#%d [%s] %s: %s\n", e.ID, e.Type, e.Title, snippet)
 		}
 		b.WriteString("\n")
 	}
 
-	// Focus
-	fmt.Fprintf(&b, ">>> #%d [%s] %s <<<\n", result.Focus.ID, result.Focus.Type, result.Focus.Title)
-	fmt.Fprintf(&b, "%s\n\n", result.Focus.Content)
+	fmt.Fprintf(b, ">>> #%d [%s] %s <<<\n", result.Focus.ID, result.Focus.Type, result.Focus.Title)
+	fmt.Fprintf(b, "%s\n\n", result.Focus.Content)
 
-	// After entries
 	if len(result.After) > 0 {
 		b.WriteString("--- After ---\n")
 		for _, e := range result.After {
 			snippet := memory.Truncate(e.Content, 200)
-			fmt.Fprintf(&b, "#%d [%s] %s: %s\n", e.ID, e.Type, e.Title, snippet)
+			fmt.Fprintf(b, "#%d [%s] %s: %s\n", e.ID, e.Type, e.Title, snippet)
 		}
 	}
+}
 
-	return mcp.NewToolResultText(b.String()), nil
+// formatTimelineSummary shows only titles and types — no content at all.
+func (t *TimelineTool) formatTimelineSummary(b *strings.Builder, result *memory.TimelineResult) {
+	if len(result.Before) > 0 {
+		b.WriteString("--- Before ---\n")
+		for _, e := range result.Before {
+			fmt.Fprintf(b, "#%d [%s] %s\n", e.ID, e.Type, e.Title)
+		}
+		b.WriteString("\n")
+	}
+
+	fmt.Fprintf(b, ">>> #%d [%s] %s <<<\n\n", result.Focus.ID, result.Focus.Type, result.Focus.Title)
+
+	if len(result.After) > 0 {
+		b.WriteString("--- After ---\n")
+		for _, e := range result.After {
+			fmt.Fprintf(b, "#%d [%s] %s\n", e.ID, e.Type, e.Title)
+		}
+	}
+}
+
+// formatTimelineFull shows complete untruncated content for ALL entries.
+func (t *TimelineTool) formatTimelineFull(b *strings.Builder, result *memory.TimelineResult) {
+	if len(result.Before) > 0 {
+		b.WriteString("--- Before ---\n")
+		for _, e := range result.Before {
+			fmt.Fprintf(b, "#%d [%s] %s: %s\n", e.ID, e.Type, e.Title, e.Content)
+		}
+		b.WriteString("\n")
+	}
+
+	fmt.Fprintf(b, ">>> #%d [%s] %s <<<\n", result.Focus.ID, result.Focus.Type, result.Focus.Title)
+	fmt.Fprintf(b, "%s\n\n", result.Focus.Content)
+
+	if len(result.After) > 0 {
+		b.WriteString("--- After ---\n")
+		for _, e := range result.After {
+			fmt.Fprintf(b, "#%d [%s] %s: %s\n", e.ID, e.Type, e.Title, e.Content)
+		}
+	}
 }
 
 // ─── GetObservationTool ─────────────────────────────────────────────────────

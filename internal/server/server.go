@@ -482,6 +482,31 @@ This helps future sessions understand context without the user repeating themsel
 3. Use mem_timeline to see chronological context around a search result
 4. Use mem_get_observation to read the full, untruncated content
 
+### Response Verbosity Control (detail_level parameter)
+Several read-heavy tools support a detail_level parameter that controls response size.
+Use this to manage context window budget — fetch the minimum detail needed first,
+then drill deeper only when necessary (Anthropic: "context is a finite resource").
+
+**Available levels**:
+- summary: Minimal tokens — IDs, titles, metadata only. Use for orientation and triage.
+- standard (default): Truncated content snippets. Good balance for most operations.
+- full: Complete untruncated content. Use only when you need to analyze details.
+
+**Tools that support detail_level**:
+- mem_context: Controls observation content in recent memory context
+- mem_search: Controls search result content (summary = titles only, full = complete content)
+- mem_timeline: Controls timeline entries (summary = titles only, full = all content untruncated)
+- sdd_context_check: Controls artifact excerpts and memory results in change reports
+- sdd_get_context: Controls pipeline artifact content (summary = sizes only, full = complete artifacts)
+
+**Progressive disclosure with detail_level**:
+1. Start with summary to scan what exists (minimal tokens)
+2. If something looks relevant, use standard for that specific tool call
+3. Only use full when you need the complete content for analysis
+
+Summary-mode responses include a footer hint reminding about the option to use
+standard or full for more detail.
+
 ### Knowledge Graph (Relations)
 
 Observations can be connected with typed, directional relations to form a knowledge graph.

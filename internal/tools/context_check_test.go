@@ -125,10 +125,10 @@ func TestContextCheckTool_Definition(t *testing.T) {
 		t.Errorf("tool name = %q, want %q", def.Name, "sdd_context_check")
 	}
 
-	// Should have change_description (required) and project_name (optional).
+	// Should have change_description (required), project_name (optional), and detail_level (optional).
 	props := def.InputSchema.Properties
-	if len(props) != 2 {
-		t.Errorf("parameter count = %d, want 2", len(props))
+	if len(props) != 3 {
+		t.Errorf("parameter count = %d, want 3", len(props))
 	}
 
 	required := def.InputSchema.Required
@@ -568,6 +568,152 @@ func TestContextCheckTool_Handle_EmptyProject(t *testing.T) {
 	}
 	if !strings.Contains(text, "No convention files found") {
 		t.Error("result should indicate no convention files")
+	}
+}
+
+// --- Detail level tests for context-check ---
+
+func TestContextCheckTool_Handle_SummaryLevel(t *testing.T) {
+	tmpDir, cleanup := setupContextCheckProject(t)
+	defer cleanup()
+
+	// Write SDD artifacts.
+	writeArtifact(t, tmpDir, "proposal.md", "# Proposal\n\nBuild an authentication system with OAuth2 and JWT.")
+	writeArtifact(t, tmpDir, "requirements.md", "# Requirements\n\n- FR-001: User login\n- FR-002: Password reset")
+
+	cs := changes.NewFileStore()
+	memStore := newContextCheckMemStore(t)
+
+	// Save an explore observation.
+	if _, err := memStore.AddObservation(memory.AddObservationParams{
+		SessionID: "manual-save",
+		Type:      "explore",
+		Title:     "Auth exploration",
+		Content:   "Exploring JWT authentication patterns with session-based comparison and detailed analysis",
+		Scope:     "project",
+	}); err != nil {
+		t.Fatalf("save explore observation: %v", err)
+	}
+
+	tool := NewContextCheckTool(cs, memStore)
+
+	req := contextCheckReq(map[string]interface{}{
+		"change_description": "JWT authentication patterns",
+		"detail_level":       "summary",
+	})
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("unexpected error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Summary should show artifact names and sizes but NOT excerpts
+	if !strings.Contains(text, "proposal.md") {
+		t.Error("summary should list artifact names")
+	}
+	if strings.Contains(text, "## Artifact Excerpts") {
+		t.Error("summary should NOT contain Artifact Excerpts section")
+	}
+	if strings.Contains(text, "authentication system") {
+		t.Error("summary should NOT contain artifact content")
+	}
+
+	// Memory results should show title but not full content
+	if !strings.Contains(text, "Auth exploration") {
+		t.Error("summary should show memory observation title")
+	}
+	if strings.Contains(text, "detailed analysis") {
+		t.Error("summary should NOT show memory observation full content")
+	}
+
+	// Should have footer hint
+	if !strings.Contains(text, "detail_level") {
+		t.Error("summary should have footer hint about detail_level")
+	}
+}
+
+func TestContextCheckTool_Handle_FullLevel(t *testing.T) {
+	tmpDir, cleanup := setupContextCheckProject(t)
+	defer cleanup()
+
+	artifactContent := strings.Repeat("Full artifact content block. ", 30) // 870+ chars
+	writeArtifact(t, tmpDir, "proposal.md", "# Proposal\n\n"+artifactContent)
+
+	cs := changes.NewFileStore()
+	tool := NewContextCheckTool(cs, nil)
+
+	req := contextCheckReq(map[string]interface{}{
+		"change_description": "Update proposal",
+		"detail_level":       "full",
+	})
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("unexpected error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Full mode should have Artifact Excerpts with complete untruncated content
+	if !strings.Contains(text, "## Artifact Excerpts") {
+		t.Error("full mode should contain Artifact Excerpts section")
+	}
+	if !strings.Contains(text, artifactContent) {
+		t.Error("full mode should contain complete untruncated artifact content")
+	}
+	// Should NOT have truncation markers
+	if strings.Contains(text, "[...truncated]") {
+		t.Error("full mode should NOT have truncation markers")
+	}
+	// Should NOT have footer hint
+	if strings.Contains(text, "💡") {
+		t.Error("full mode should NOT have footer hint")
+	}
+}
+
+func TestContextCheckTool_Handle_StandardLevel(t *testing.T) {
+	tmpDir, cleanup := setupContextCheckProject(t)
+	defer cleanup()
+
+	artifactContent := strings.Repeat("Standard artifact content block. ", 30) // 960+ chars
+	writeArtifact(t, tmpDir, "proposal.md", "# Proposal\n\n"+artifactContent)
+
+	cs := changes.NewFileStore()
+	tool := NewContextCheckTool(cs, nil)
+
+	req := contextCheckReq(map[string]interface{}{
+		"change_description": "Update proposal",
+		"detail_level":       "standard",
+	})
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle returned error: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("unexpected error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+
+	// Standard mode should have Artifact Excerpts but truncated
+	if !strings.Contains(text, "## Artifact Excerpts") {
+		t.Error("standard mode should contain Artifact Excerpts section")
+	}
+	if !strings.Contains(text, "Standard artifact content block") {
+		t.Error("standard mode should contain beginning of content")
+	}
+	// Content should be truncated (500 chars max for standard artifacts)
+	if strings.Contains(text, artifactContent) {
+		t.Error("standard mode should truncate long artifact content")
 	}
 }
 
