@@ -213,72 +213,31 @@ body {
 .node-row.right { justify-content: flex-end; padding-right: 20%; }
 .node-row.center { justify-content: center; }
 
-/* Connector lines */
-.connector {
+/* SVG Connector overlay */
+.connector-svg {
   position: absolute;
-  left: 50%;
-  top: -16px;
-  width: var(--path-width);
-  height: 20px;
-  background: var(--border);
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
   z-index: 0;
 }
 
-.node-row.left .connector,
-.node-row.right .connector {
-  width: 80px;
-  height: var(--path-width);
-  top: 50%;
-  transform: translateY(-50%);
+.connector-svg path {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: var(--path-width);
+  stroke-linecap: round;
+  transition: stroke 0.3s ease;
 }
 
-.node-row.left .connector {
-  left: auto;
-  right: calc(80% - 36px);
-  width: calc(30% - 36px);
-  top: -20px;
-  height: 40px;
-  background: none;
-  border-left: var(--path-width) solid var(--border);
-  border-bottom: var(--path-width) solid var(--border);
-  border-bottom-left-radius: 24px;
+.connector-svg path.connector-active {
+  stroke: var(--accent-blue);
 }
 
-.node-row.right .connector {
-  left: calc(20% + 36px);
-  width: calc(30% - 36px);
-  top: -20px;
-  height: 40px;
-  background: none;
-  border-right: var(--path-width) solid var(--border);
-  border-bottom: var(--path-width) solid var(--border);
-  border-bottom-right-radius: 24px;
-}
-
-.node-row.center .connector {
-  display: block;
-}
-
-.node-row:first-child .connector {
-  display: none;
-}
-
-/* connector active state */
-.node-row.connector-active .connector {
-  border-color: var(--accent-blue);
-}
-
-.node-row.connector-active.connector-completed .connector {
-  border-color: var(--accent-green);
-}
-
-.node-row.center.connector-active .connector {
-  background: var(--accent-blue);
-}
-
-.node-row.center.connector-completed .connector {
-  background: var(--accent-green);
+.connector-svg path.connector-completed {
+  stroke: var(--accent-green);
 }
 
 /* ============================================
@@ -832,29 +791,6 @@ body {
     padding-right: 0;
   }
 
-  .node-row.left .connector,
-  .node-row.right .connector {
-    left: 50%;
-    right: auto;
-    width: var(--path-width);
-    height: 20px;
-    top: -16px;
-    border: none;
-    background: var(--border);
-    border-radius: 0;
-    transform: translateX(-50%);
-  }
-
-  .node-row.connector-active.left .connector,
-  .node-row.connector-active.right .connector {
-    background: var(--accent-blue);
-  }
-
-  .node-row.connector-completed.left .connector,
-  .node-row.connector-completed.right .connector {
-    background: var(--accent-green);
-  }
-
   :root { --node-size: 64px; }
 
   .modal { max-width: 95%; }
@@ -1404,21 +1340,7 @@ function renderTree() {
     row.className = `node-row ${pos}`;
     row.id = `node-row-${node.id}`;
 
-    // Connector states
-    if (i > 0) {
-      const prevState = getNodeState(NODES[i-1].id);
-      if (prevState === 'completed' || state === 'completed' || state === 'current') {
-        row.classList.add('connector-active');
-      }
-      if (prevState === 'completed' && state === 'completed') {
-        row.classList.add('connector-completed');
-      }
-    }
-
-    const connector = i > 0 ? '<div class="connector"></div>' : '';
-
     row.innerHTML = `
-      ${connector}
       <div class="node ${state}" data-id="${node.id}" role="button" tabindex="${state !== 'locked' ? 0 : -1}" aria-label="${node.title}${state === 'locked' ? ' (locked)' : ''}">
         <span class="node-icon">${node.icon}</span>
         <span class="node-title">${node.title}</span>
@@ -1427,7 +1349,87 @@ function renderTree() {
 
     tree.appendChild(row);
   });
+
+  // Draw SVG connectors after DOM is updated
+  requestAnimationFrame(renderConnectors);
 }
+
+/* ============================================
+   SVG CONNECTORS
+   ============================================ */
+function renderConnectors() {
+  const tree = document.getElementById('skill-tree');
+  const isMobile = window.innerWidth <= 768;
+
+  // Remove old SVG if exists
+  const oldSvg = tree.querySelector('.connector-svg');
+  if (oldSvg) oldSvg.remove();
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.classList.add('connector-svg');
+  const treeRect = tree.getBoundingClientRect();
+  svg.setAttribute('width', treeRect.width);
+  svg.setAttribute('height', treeRect.height);
+  svg.setAttribute('viewBox', `0 0 ${treeRect.width} ${treeRect.height}`);
+
+  // Collect node center positions relative to the tree container
+  const nodePositions = [];
+  NODES.forEach((node) => {
+    const nodeEl = tree.querySelector(`[data-id="${node.id}"]`);
+    if (!nodeEl) return;
+    const nodeRect = nodeEl.getBoundingClientRect();
+    nodePositions.push({
+      id: node.id,
+      x: nodeRect.left - treeRect.left + nodeRect.width / 2,
+      y: nodeRect.top - treeRect.top + nodeRect.height / 2,
+      trackStart: node.trackStart
+    });
+  });
+
+  // Draw paths between consecutive nodes
+  for (let i = 1; i < nodePositions.length; i++) {
+    const prev = nodePositions[i - 1];
+    const curr = nodePositions[i];
+
+    // Skip drawing across track boundaries (labels break the visual flow)
+    // But still draw — the track label is between them visually
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+
+    if (isMobile || Math.abs(prev.x - curr.x) < 10) {
+      // Straight vertical line
+      path.setAttribute('d', `M ${prev.x} ${prev.y} L ${curr.x} ${curr.y}`);
+    } else {
+      // Smooth S-curve between zigzag nodes
+      const midY = (prev.y + curr.y) / 2;
+      path.setAttribute('d', 
+        `M ${prev.x} ${prev.y} C ${prev.x} ${midY}, ${curr.x} ${midY}, ${curr.x} ${curr.y}`
+      );
+    }
+
+    // Determine connector color state
+    const prevState = getNodeState(NODES[i - 1].id);
+    const currState = getNodeState(NODES[i].id);
+
+    if (prevState === 'completed' && currState === 'completed') {
+      path.classList.add('connector-completed');
+    } else if (prevState === 'completed' || currState === 'completed' || currState === 'current') {
+      path.classList.add('connector-active');
+    }
+
+    svg.appendChild(path);
+  }
+
+  // Insert SVG as first child so it's behind everything
+  tree.insertBefore(svg, tree.firstChild);
+}
+
+// Redraw connectors on resize
+let resizeTimeout;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimeout);
+  resizeTimeout = setTimeout(renderConnectors, 100);
+});
 
 /* ============================================
    RENDER PROGRESS
