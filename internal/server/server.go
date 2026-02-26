@@ -569,6 +569,43 @@ Tools with navigation hints: mem_search, mem_context, mem_timeline.
 Summary-mode responses include a footer hint reminding about the option to use
 standard or full for more detail.
 
+### Sub-Agent Memory Scoping (namespace parameter)
+
+When multiple AI sub-agents work in parallel (e.g., orchestrator spawns researcher, coder, reviewer),
+use the namespace parameter to isolate each sub-agent's memory observations.
+
+**What namespace does**:
+- Tags observations with a namespace string (e.g., "subagent/task-123", "agent/researcher")
+- Read tools filter by namespace when provided — each sub-agent sees only its own notes
+- Omitting namespace = no filter — the orchestrator sees EVERYTHING (by design)
+
+**Namespace vs scope**: These are orthogonal concepts:
+- scope = WHO sees it (project vs personal) — visibility level
+- namespace = WHICH AGENT owns it — isolation boundary
+
+**Tools that support namespace**:
+- Write: mem_save, mem_save_prompt, mem_session_summary, mem_progress
+- Read: mem_search, mem_context, mem_compact
+
+**Convention for namespace values**:
+- Sub-agents by task: "subagent/task-123", "subagent/research-auth"
+- Sub-agents by role: "agent/researcher", "agent/coder", "agent/reviewer"
+- Orchestrator: omit namespace entirely (sees all namespaces)
+
+**Typical multi-agent workflow**:
+1. Orchestrator spawns sub-agent with a task ID
+2. Sub-agent uses namespace="subagent/<task-id>" on all mem_save/mem_search calls
+3. Sub-agent's observations are isolated — no cross-contamination with other sub-agents
+4. Orchestrator reads without namespace to see all observations, then synthesizes
+5. Orchestrator saves final synthesis without namespace (shared knowledge)
+
+**mem_progress with namespace**: When namespace is provided, the topic_key becomes
+"progress/<namespace>/<project>" instead of "progress/<project>", giving each
+sub-agent its own progress document.
+
+**mem_timeline does NOT support namespace**: Timeline is inherently ID-scoped
+(centered on a specific observation_id), so namespace filtering is unnecessary.
+
 ### Knowledge Graph (Relations)
 
 Observations can be connected with typed, directional relations to form a knowledge graph.

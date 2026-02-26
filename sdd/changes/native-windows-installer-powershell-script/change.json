@@ -1,0 +1,31 @@
+{
+  "id": "native-windows-installer-powershell-script",
+  "type": "feature",
+  "size": "small",
+  "description": "Native Windows installer PowerShell script",
+  "stages": [
+    {
+      "name": "describe",
+      "status": "completed",
+      "started_at": "2026-02-24T13:58:18Z",
+      "completed_at": "2026-02-24T13:58:28Z"
+    },
+    {
+      "name": "tasks",
+      "status": "completed",
+      "started_at": "2026-02-24T13:58:28Z",
+      "completed_at": "2026-02-24T13:58:59Z"
+    },
+    {
+      "name": "verify",
+      "status": "completed",
+      "started_at": "2026-02-24T13:58:59Z",
+      "completed_at": "2026-02-24T14:00:19Z"
+    }
+  ],
+  "current_stage": "verify",
+  "adrs": [],
+  "status": "completed",
+  "created_at": "2026-02-24T13:58:18Z",
+  "updated_at": "2026-02-24T14:00:19Z"
+}

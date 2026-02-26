@@ -41,6 +41,9 @@ func (t *ContextTool) Definition() mcp.Tool {
 			),
 			mcp.Enum(memory.DetailLevelValues()...),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace filter (e.g. 'subagent/task-123'). When set, only returns context from this namespace."),
+		),
 	)
 }
 
@@ -50,10 +53,12 @@ func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	scope := req.GetString("scope", "")
 	limit := intArg(req, "limit", 0)
 	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
+	namespace := req.GetString("namespace", "")
 
 	formatted, err := t.store.FormatContextDetailed(project, scope, memory.ContextFormatOptions{
 		DetailLevel: detailLevel,
 		Limit:       limit,
+		Namespace:   namespace,
 	})
 	if err != nil {
 		return mcp.NewToolResultText("No memory context available."), nil
@@ -69,7 +74,7 @@ func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	}
 
 	// Navigation hint when observations are capped by limit.
-	total, err := t.store.CountObservations(project, scope)
+	total, err := t.store.CountObservations(project, scope, namespace)
 	if err == nil {
 		// Use effective limit: explicit or default (20).
 		effectiveLimit := limit

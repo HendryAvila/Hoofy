@@ -135,6 +135,9 @@ func (t *SessionSummaryTool) Definition() mcp.Tool {
 		mcp.WithString("session_id",
 			mcp.Description("Session ID (default: manual-save)"),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace for memory isolation (e.g. 'subagent/task-123', 'agent/researcher'). When set, the summary is scoped to this namespace."),
+		),
 	)
 }
 
@@ -151,6 +154,7 @@ func (t *SessionSummaryTool) Handle(ctx context.Context, req mcp.CallToolRequest
 	}
 
 	sessionID := req.GetString("session_id", "manual-save")
+	namespace := req.GetString("namespace", "")
 
 	id, err := t.store.AddObservation(memory.AddObservationParams{
 		SessionID: sessionID,
@@ -160,6 +164,7 @@ func (t *SessionSummaryTool) Handle(ctx context.Context, req mcp.CallToolRequest
 		Project:   project,
 		Scope:     "project",
 		TopicKey:  "",
+		Namespace: namespace,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to save session summary: %v", err)), nil

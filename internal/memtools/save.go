@@ -48,6 +48,9 @@ func (t *SaveTool) Definition() mcp.Tool {
 		mcp.WithString("topic_key",
 			mcp.Description("Optional topic identifier for upserts (e.g. architecture/auth-model). Reuses and updates the latest observation in same project+scope."),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace for memory isolation (e.g. 'subagent/task-123', 'agent/researcher'). When set, observations are scoped to this namespace."),
+		),
 	)
 }
 
@@ -68,6 +71,7 @@ func (t *SaveTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 	project := req.GetString("project", "")
 	scope := req.GetString("scope", "project")
 	topicKey := req.GetString("topic_key", "")
+	namespace := req.GetString("namespace", "")
 
 	id, err := t.store.AddObservation(memory.AddObservationParams{
 		SessionID: sessionID,
@@ -77,6 +81,7 @@ func (t *SaveTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.Ca
 		Project:   project,
 		Scope:     scope,
 		TopicKey:  topicKey,
+		Namespace: namespace,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to save observation: %v", err)), nil
@@ -121,6 +126,9 @@ func (t *SavePromptTool) Definition() mcp.Tool {
 		mcp.WithString("project",
 			mcp.Description("Project name"),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace for memory isolation (e.g. 'subagent/task-123', 'agent/researcher'). When set, prompts are scoped to this namespace."),
+		),
 	)
 }
 
@@ -133,11 +141,13 @@ func (t *SavePromptTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*
 
 	sessionID := req.GetString("session_id", "manual-save")
 	project := req.GetString("project", "")
+	namespace := req.GetString("namespace", "")
 
 	id, err := t.store.AddPrompt(memory.AddPromptParams{
 		SessionID: sessionID,
 		Content:   content,
 		Project:   project,
+		Namespace: namespace,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to save prompt: %v", err)), nil

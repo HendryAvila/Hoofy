@@ -50,6 +50,9 @@ func (t *SearchTool) Definition() mcp.Tool {
 			),
 			mcp.Enum(memory.DetailLevelValues()...),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace filter (e.g. 'subagent/task-123'). When set, only returns memories from this namespace."),
+		),
 	)
 }
 
@@ -65,12 +68,14 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	scope := req.GetString("scope", "")
 	limit := intArg(req, "limit", 10)
 	detailLevel := memory.ParseDetailLevel(req.GetString("detail_level", ""))
+	namespace := req.GetString("namespace", "")
 
 	results, err := t.store.Search(query, memory.SearchOptions{
-		Type:    typ,
-		Project: project,
-		Scope:   scope,
-		Limit:   limit,
+		Type:      typ,
+		Project:   project,
+		Scope:     scope,
+		Limit:     limit,
+		Namespace: namespace,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("search failed: %v", err)), nil
@@ -124,9 +129,10 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 
 	// Navigation hint when results are capped by limit.
 	total, err := t.store.CountSearchResults(query, memory.SearchOptions{
-		Type:    typ,
-		Project: project,
-		Scope:   scope,
+		Type:      typ,
+		Project:   project,
+		Scope:     scope,
+		Namespace: namespace,
 	})
 	if err == nil {
 		b.WriteString(memory.NavigationHint(len(results), total,

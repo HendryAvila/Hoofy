@@ -1,0 +1,37 @@
+{
+  "id": "add-best-practices-section-to-readme-with-real",
+  "type": "enhancement",
+  "size": "medium",
+  "description": "Add Best Practices section to README with real workflows and Mermaid diagrams",
+  "stages": [
+    {
+      "name": "propose",
+      "status": "completed",
+      "started_at": "2026-02-24T17:03:39Z",
+      "completed_at": "2026-02-24T17:06:05Z"
+    },
+    {
+      "name": "spec",
+      "status": "completed",
+      "started_at": "2026-02-24T17:06:05Z",
+      "completed_at": "2026-02-24T17:06:21Z"
+    },
+    {
+      "name": "tasks",
+      "status": "completed",
+      "started_at": "2026-02-24T17:06:21Z",
+      "completed_at": "2026-02-24T17:06:43Z"
+    },
+    {
+      "name": "verify",
+      "status": "completed",
+      "started_at": "2026-02-24T17:06:43Z",
+      "completed_at": "2026-02-24T17:11:14Z"
+    }
+  ],
+  "current_stage": "verify",
+  "adrs": [],
+  "status": "completed",
+  "created_at": "2026-02-24T17:03:39Z",
+  "updated_at": "2026-02-24T17:11:14Z"
+}

@@ -10,10 +10,10 @@ Persistent context across sessions. SQLite + FTS5 full-text search with a knowle
 
 | Tool | Description |
 |---|---|
-| `mem_save` | Save an observation (decision, bugfix, pattern, discovery, config, architecture) |
-| `mem_save_prompt` | Record user intent for future context |
-| `mem_search` | Full-text search across all sessions |
-| `mem_context` | Recent observations for session startup |
+| `mem_save` | Save an observation (decision, bugfix, pattern, discovery, config, architecture). Supports `namespace` for sub-agent isolation |
+| `mem_save_prompt` | Record user intent for future context. Supports `namespace` for sub-agent isolation |
+| `mem_search` | Full-text search across all sessions. Supports `namespace` to filter by sub-agent |
+| `mem_context` | Recent observations for session startup. Supports `namespace` to filter by sub-agent |
 | `mem_timeline` | Chronological context around a specific event |
 | `mem_get_observation` | Full content of a specific observation (includes direct relations) |
 | `mem_relate` | Create a typed directional relation between two observations (`relates_to`, `depends_on`, `caused_by`, `implements`, `supersedes`, `part_of`) |
@@ -21,14 +21,14 @@ Persistent context across sessions. SQLite + FTS5 full-text search with a knowle
 | `mem_build_context` | Traverse the knowledge graph from a starting observation with configurable depth |
 | `mem_session_start` | Register a new coding session |
 | `mem_session_end` | Close a session with summary |
-| `mem_session_summary` | Save comprehensive end-of-session summary |
+| `mem_session_summary` | Save comprehensive end-of-session summary. Supports `namespace` for sub-agent isolation |
 | `mem_stats` | Memory system statistics |
 | `mem_capture_passive` | Passive observation capture from conversation content |
 | `mem_delete` | Remove an observation |
 | `mem_update` | Update an existing observation |
 | `mem_suggest_topic_key` | Suggest stable key for upserts (evolving knowledge) |
-| `mem_progress` | Read/write structured JSON progress doc for long-running sessions (one per project, auto-upserted) |
-| `mem_compact` | Identify and compact stale observations. Dual behavior: without `compact_ids` lists candidates, with `compact_ids` batch soft-deletes and optionally creates a summary observation |
+| `mem_progress` | Read/write structured JSON progress doc for long-running sessions (one per project, auto-upserted). Supports `namespace` — scoped progress becomes `progress/<namespace>/<project>` |
+| `mem_compact` | Identify and compact stale observations. Dual behavior: without `compact_ids` lists candidates, with `compact_ids` batch soft-deletes and optionally creates a summary observation. Supports `namespace` to scope compaction |
 
 ## Change Pipeline (6 tools)
 

@@ -692,7 +692,7 @@ func TestDeleteObservation_SoftDelete(t *testing.T) {
 	}
 
 	// But should still exist in search/recent (filtered by deleted_at IS NULL)
-	obs, err := s.RecentObservations("proj", "", 100)
+	obs, err := s.RecentObservations("proj", "", "", 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -746,7 +746,7 @@ func TestRecentObservations(t *testing.T) {
 		}
 	}
 
-	results, err := s.RecentObservations("proj", "project", 3)
+	results, err := s.RecentObservations("proj", "project", "", 3)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -771,7 +771,7 @@ func TestRecentObservations_EmptyFilters(t *testing.T) {
 	}
 
 	// No filters → return all
-	results, err := s.RecentObservations("", "", 10)
+	results, err := s.RecentObservations("", "", "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1115,7 +1115,7 @@ func TestTimeline_DefaultLimits(t *testing.T) {
 
 func TestCountObservations_Empty(t *testing.T) {
 	s := newTestStore(t)
-	count, err := s.CountObservations("", "")
+	count, err := s.CountObservations("", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1149,25 +1149,25 @@ func TestCountObservations_WithData(t *testing.T) {
 	}
 
 	// Unfiltered
-	count, _ := s.CountObservations("", "")
+	count, _ := s.CountObservations("", "", "")
 	if count != 8 {
 		t.Errorf("CountObservations('', '') = %d, want 8", count)
 	}
 
 	// Filter by project
-	count, _ = s.CountObservations("proj-a", "")
+	count, _ = s.CountObservations("proj-a", "", "")
 	if count != 5 {
 		t.Errorf("CountObservations('proj-a', '') = %d, want 5", count)
 	}
 
 	// Filter by scope
-	count, _ = s.CountObservations("", "personal")
+	count, _ = s.CountObservations("", "personal", "")
 	if count != 3 {
 		t.Errorf("CountObservations('', 'personal') = %d, want 3", count)
 	}
 
 	// Filter by both
-	count, _ = s.CountObservations("proj-b", "personal")
+	count, _ = s.CountObservations("proj-b", "personal", "")
 	if count != 3 {
 		t.Errorf("CountObservations('proj-b', 'personal') = %d, want 3", count)
 	}
@@ -1190,7 +1190,7 @@ func TestCountObservations_ExcludesSoftDeleted(t *testing.T) {
 	}
 	_ = s.DeleteObservation(id, false)
 
-	count, _ := s.CountObservations("proj", "")
+	count, _ := s.CountObservations("proj", "", "")
 	if count != 1 {
 		t.Errorf("CountObservations after soft-delete = %d, want 1", count)
 	}
@@ -1558,7 +1558,7 @@ func TestPassiveCapture_SavesLearnings(t *testing.T) {
 	}
 
 	// Verify they're searchable
-	obs, _ := s.RecentObservations("proj", "", 10)
+	obs, _ := s.RecentObservations("proj", "", "", 10)
 	if len(obs) < 2 {
 		t.Errorf("expected at least 2 observations after passive capture, got %d", len(obs))
 	}
@@ -2353,6 +2353,324 @@ func TestMigration_RelationsTableIdempotent(t *testing.T) {
 	_ = s2.Close()
 }
 
+// ─── Namespace Filtering ─────────────────────────────────────────────────────
+
+// mustAddNamespacedObs creates an observation with a namespace and returns its ID.
+func mustAddNamespacedObs(t *testing.T, s *memory.Store, sessID, title, content, project, namespace string) int64 {
+	t.Helper()
+	id, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: sessID,
+		Type:      "manual",
+		Title:     title,
+		Content:   content,
+		Project:   project,
+		Scope:     "project",
+		Namespace: namespace,
+	})
+	if err != nil {
+		t.Fatalf("mustAddNamespacedObs(%q, ns=%q): %v", title, namespace, err)
+	}
+	return id
+}
+
+func TestAddObservation_WithNamespace(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "decision",
+		Title:     "Namespaced decision",
+		Content:   "This belongs to the researcher sub-agent",
+		Project:   "proj",
+		Scope:     "project",
+		Namespace: "subagent/researcher",
+	})
+	if err != nil {
+		t.Fatalf("AddObservation with namespace: %v", err)
+	}
+
+	obs, err := s.GetObservation(id)
+	if err != nil {
+		t.Fatalf("GetObservation: %v", err)
+	}
+	if obs.Namespace == nil || *obs.Namespace != "subagent/researcher" {
+		t.Errorf("Namespace = %v, want ptr to 'subagent/researcher'", obs.Namespace)
+	}
+}
+
+func TestAddObservation_WithoutNamespace_IsNull(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	id, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "manual",
+		Title:     "No namespace",
+		Content:   "Orchestrator-level observation, no namespace",
+		Project:   "proj",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	obs, err := s.GetObservation(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obs.Namespace != nil {
+		t.Errorf("Namespace = %v, want nil (no namespace set)", obs.Namespace)
+	}
+}
+
+func TestRecentObservations_NamespaceFilter(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	// Create 3 observations: 2 in namespace "agent/A", 1 in namespace "agent/B"
+	mustAddNamespacedObs(t, s, "sess", "A-1", "content A-1 unique", "proj", "agent/A")
+	mustAddNamespacedObs(t, s, "sess", "A-2", "content A-2 unique", "proj", "agent/A")
+	mustAddNamespacedObs(t, s, "sess", "B-1", "content B-1 unique", "proj", "agent/B")
+
+	results, err := s.RecentObservations("proj", "", "agent/A", 10)
+	if err != nil {
+		t.Fatalf("RecentObservations with namespace: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("len = %d, want 2 (only agent/A)", len(results))
+	}
+	for _, r := range results {
+		if r.Namespace == nil || *r.Namespace != "agent/A" {
+			t.Errorf("result namespace = %v, want agent/A", r.Namespace)
+		}
+	}
+}
+
+func TestRecentObservations_EmptyNamespace_ReturnsAll(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	mustAddNamespacedObs(t, s, "sess", "NS-1", "content namespaced unique", "proj", "agent/A")
+	mustAddObs(t, s, "sess", "Global-1", "content global unique", "proj")
+
+	// Empty namespace = no filter → returns all
+	results, err := s.RecentObservations("proj", "", "", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("len = %d, want 2 (all observations)", len(results))
+	}
+}
+
+func TestCountObservations_NamespaceFilter(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	mustAddNamespacedObs(t, s, "sess", "NS-A-1", "count ns A content unique 1", "proj", "agent/A")
+	mustAddNamespacedObs(t, s, "sess", "NS-A-2", "count ns A content unique 2", "proj", "agent/A")
+	mustAddNamespacedObs(t, s, "sess", "NS-B-1", "count ns B content unique 1", "proj", "agent/B")
+	mustAddObs(t, s, "sess", "No-NS", "count global content unique", "proj")
+
+	// All
+	count, _ := s.CountObservations("proj", "", "")
+	if count != 4 {
+		t.Errorf("CountObservations(no ns filter) = %d, want 4", count)
+	}
+
+	// agent/A only
+	count, _ = s.CountObservations("proj", "", "agent/A")
+	if count != 2 {
+		t.Errorf("CountObservations(agent/A) = %d, want 2", count)
+	}
+
+	// agent/B only
+	count, _ = s.CountObservations("proj", "", "agent/B")
+	if count != 1 {
+		t.Errorf("CountObservations(agent/B) = %d, want 1", count)
+	}
+}
+
+func TestSearch_NamespaceFilter(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	mustAddNamespacedObs(t, s, "sess", "JWT middleware search", "Authentication with JWT tokens for search test", "proj", "agent/coder")
+	mustAddNamespacedObs(t, s, "sess", "JWT research search", "Researching JWT alternatives for search test", "proj", "agent/researcher")
+
+	// Search with namespace filter
+	results, err := s.Search("JWT search", memory.SearchOptions{Namespace: "agent/coder"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("len = %d, want 1 (only agent/coder)", len(results))
+	}
+	if results[0].Namespace == nil || *results[0].Namespace != "agent/coder" {
+		t.Errorf("namespace = %v, want agent/coder", results[0].Namespace)
+	}
+
+	// Search without namespace → returns both
+	all, err := s.Search("JWT search", memory.SearchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Errorf("unfiltered search len = %d, want 2", len(all))
+	}
+}
+
+func TestAddObservation_TopicKeyUpsert_NamespaceIsolation(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	// Same topic_key, different namespaces → should NOT upsert
+	id1, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "architecture",
+		Title:     "Auth v1",
+		Content:   "Session cookies for auth",
+		Project:   "proj",
+		Scope:     "project",
+		TopicKey:  "architecture/auth",
+		Namespace: "agent/A",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	id2, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "architecture",
+		Title:     "Auth v1 from B",
+		Content:   "JWT tokens for auth",
+		Project:   "proj",
+		Scope:     "project",
+		TopicKey:  "architecture/auth",
+		Namespace: "agent/B",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if id1 == id2 {
+		t.Errorf("same topic_key in different namespaces should create separate observations, got same ID %d", id1)
+	}
+
+	// Same topic_key, same namespace → SHOULD upsert
+	id3, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "architecture",
+		Title:     "Auth v2 from A",
+		Content:   "Switched to OAuth in agent A",
+		Project:   "proj",
+		Scope:     "project",
+		TopicKey:  "architecture/auth",
+		Namespace: "agent/A",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if id1 != id3 {
+		t.Errorf("same topic_key + same namespace should upsert: id1=%d, id3=%d", id1, id3)
+	}
+
+	obs, err := s.GetObservation(id1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obs.Content != "Switched to OAuth in agent A" {
+		t.Errorf("content not updated after upsert: %q", obs.Content)
+	}
+	if obs.RevisionCount != 2 {
+		t.Errorf("RevisionCount = %d, want 2", obs.RevisionCount)
+	}
+}
+
+func TestAddObservation_Dedup_NamespaceIsolation(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	params := memory.AddObservationParams{
+		SessionID: "sess",
+		Type:      "decision",
+		Title:     "Dedup NS Test",
+		Content:   "Exact same content for namespace dedup isolation test",
+		Project:   "proj",
+		Scope:     "project",
+		Namespace: "agent/A",
+	}
+
+	id1, err := s.AddObservation(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Same content, different namespace → should NOT dedup
+	params.Namespace = "agent/B"
+	id2, err := s.AddObservation(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if id1 == id2 {
+		t.Errorf("same content in different namespaces should create separate observations, got same ID %d", id1)
+	}
+
+	// Same content, same namespace → SHOULD dedup
+	params.Namespace = "agent/A"
+	id3, err := s.AddObservation(params)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if id1 != id3 {
+		t.Errorf("same content + same namespace should dedup: id1=%d, id3=%d", id1, id3)
+	}
+
+	obs, err := s.GetObservation(id1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if obs.DuplicateCount != 2 {
+		t.Errorf("DuplicateCount = %d, want 2", obs.DuplicateCount)
+	}
+}
+
+func TestFindStaleObservations_NamespaceFilter(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "sess", "proj")
+
+	idA := mustAddNamespacedObs(t, s, "sess", "Old-NS-A", "stale ns A content unique", "proj", "agent/A")
+	idB := mustAddNamespacedObs(t, s, "sess", "Old-NS-B", "stale ns B content unique", "proj", "agent/B")
+	_ = mustAddNamespacedObs(t, s, "sess", "Fresh-NS-A", "fresh ns A content unique", "proj", "agent/A")
+
+	ageObservation(t, s, idA, 45)
+	ageObservation(t, s, idB, 45)
+
+	// Filter by namespace agent/A → only idA (idB is agent/B)
+	stale, err := s.FindStaleObservations("proj", "", "agent/A", 30, 50)
+	if err != nil {
+		t.Fatalf("FindStaleObservations with namespace: %v", err)
+	}
+	if len(stale) != 1 {
+		t.Fatalf("got %d stale, want 1 (only agent/A)", len(stale))
+	}
+	if stale[0].ID != idA {
+		t.Errorf("expected id %d, got %d", idA, stale[0].ID)
+	}
+
+	// No namespace filter → both old ones
+	all, err := s.FindStaleObservations("proj", "", "", 30, 50)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Errorf("unfiltered stale = %d, want 2", len(all))
+	}
+}
+
 // mustAddObs is a test helper that creates an observation and returns its ID.
 func mustAddObs(t *testing.T, s *memory.Store, sessID, title, content, project string) int64 {
 	t.Helper()
@@ -2403,7 +2721,7 @@ func TestFindStaleObservations_Basic(t *testing.T) {
 	ageObservation(t, s, id1, 45)
 	ageObservation(t, s, id2, 60)
 
-	stale, err := s.FindStaleObservations("proj", "", 30, 50)
+	stale, err := s.FindStaleObservations("proj", "", "", 30, 50)
 	if err != nil {
 		t.Fatalf("FindStaleObservations: %v", err)
 	}
@@ -2435,7 +2753,7 @@ func TestFindStaleObservations_FiltersByProject(t *testing.T) {
 	ageObservation(t, s, idA, 40)
 	ageObservation(t, s, idB, 40)
 
-	stale, err := s.FindStaleObservations("proj-a", "", 30, 50)
+	stale, err := s.FindStaleObservations("proj-a", "", "", 30, 50)
 	if err != nil {
 		t.Fatalf("FindStaleObservations: %v", err)
 	}
@@ -2456,7 +2774,7 @@ func TestFindStaleObservations_RespectsLimit(t *testing.T) {
 		ageObservation(t, s, id, 90)
 	}
 
-	stale, err := s.FindStaleObservations("proj", "", 30, 3)
+	stale, err := s.FindStaleObservations("proj", "", "", 30, 3)
 	if err != nil {
 		t.Fatalf("FindStaleObservations: %v", err)
 	}
@@ -2467,11 +2785,11 @@ func TestFindStaleObservations_RespectsLimit(t *testing.T) {
 
 func TestFindStaleObservations_InvalidDays(t *testing.T) {
 	s := newTestStore(t)
-	_, err := s.FindStaleObservations("", "", 0, 10)
+	_, err := s.FindStaleObservations("", "", "", 0, 10)
 	if err == nil {
 		t.Fatal("expected error for olderThanDays=0")
 	}
-	_, err = s.FindStaleObservations("", "", -5, 10)
+	_, err = s.FindStaleObservations("", "", "", -5, 10)
 	if err == nil {
 		t.Fatal("expected error for olderThanDays=-5")
 	}
@@ -2487,7 +2805,7 @@ func TestFindStaleObservations_ExcludesDeleted(t *testing.T) {
 		t.Fatalf("soft-delete: %v", err)
 	}
 
-	stale, err := s.FindStaleObservations("proj", "", 30, 50)
+	stale, err := s.FindStaleObservations("proj", "", "", 30, 50)
 	if err != nil {
 		t.Fatalf("FindStaleObservations: %v", err)
 	}

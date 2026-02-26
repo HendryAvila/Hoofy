@@ -59,6 +59,9 @@ func (t *CompactTool) Definition() mcp.Tool {
 		mcp.WithString("session_id",
 			mcp.Description("Session ID for the summary observation (default: manual-save)"),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace filter (e.g. 'subagent/task-123'). When set, only considers observations in this namespace for compaction."),
+		),
 	)
 }
 
@@ -72,16 +75,17 @@ func (t *CompactTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 	project := req.GetString("project", "")
 	scope := req.GetString("scope", "")
 	compactIDsRaw := req.GetString("compact_ids", "")
+	namespace := req.GetString("namespace", "")
 
 	if compactIDsRaw == "" {
-		return t.handleIdentify(project, scope, olderThanDays)
+		return t.handleIdentify(project, scope, namespace, olderThanDays)
 	}
 	return t.handleExecute(req, project, scope, compactIDsRaw)
 }
 
 // handleIdentify lists stale observation candidates without deleting.
-func (t *CompactTool) handleIdentify(project, scope string, olderThanDays int) (*mcp.CallToolResult, error) {
-	stale, err := t.store.FindStaleObservations(project, scope, olderThanDays, 200)
+func (t *CompactTool) handleIdentify(project, scope, namespace string, olderThanDays int) (*mcp.CallToolResult, error) {
+	stale, err := t.store.FindStaleObservations(project, scope, namespace, olderThanDays, 200)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to find stale observations: %v", err)), nil
 	}
@@ -117,7 +121,7 @@ func (t *CompactTool) handleIdentify(project, scope string, olderThanDays int) (
 	idsJSON, _ := json.Marshal(ids)
 	fmt.Fprintf(&sb, "\n---\nTo compact these, call `mem_compact` again with `compact_ids: %q`", string(idsJSON))
 
-	totalCount, _ := t.store.CountObservations(project, scope)
+	totalCount, _ := t.store.CountObservations(project, scope, namespace)
 	fmt.Fprintf(&sb, "\n%s", memory.NavigationHint(len(stale), totalCount, ""))
 
 	return mcp.NewToolResultText(sb.String()), nil

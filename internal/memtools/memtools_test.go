@@ -1972,3 +1972,264 @@ func TestBoolArg(t *testing.T) {
 		})
 	}
 }
+
+// ─── Namespace Tests ─────────────────────────────────────────────────────────
+
+// seedNamespacedObservation creates an observation with a namespace and returns its ID.
+func seedNamespacedObservation(t *testing.T, store *memory.Store, title, content, project, namespace string) int64 {
+	t.Helper()
+	id, err := store.AddObservation(memory.AddObservationParams{
+		SessionID: "test-session",
+		Type:      "manual",
+		Title:     title,
+		Content:   content,
+		Project:   project,
+		Scope:     "project",
+		Namespace: namespace,
+	})
+	if err != nil {
+		t.Fatalf("seed namespaced observation: %v", err)
+	}
+	return id
+}
+
+func TestSaveTool_WithNamespace(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewSaveTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"title":     "Namespaced decision",
+		"content":   "Decision made by researcher sub-agent",
+		"type":      "decision",
+		"project":   "my-app",
+		"namespace": "subagent/researcher",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Namespaced decision") {
+		t.Errorf("expected title in response, got: %s", text)
+	}
+	if !strings.Contains(text, "ID:") {
+		t.Errorf("expected ID in response, got: %s", text)
+	}
+}
+
+func TestSaveTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewSaveTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_save definition missing 'namespace' parameter")
+	}
+}
+
+func TestSavePromptTool_WithNamespace(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewSavePromptTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"content":   "How do I set up auth?",
+		"project":   "my-app",
+		"namespace": "subagent/task-42",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Prompt saved") {
+		t.Errorf("expected success, got: %s", text)
+	}
+}
+
+func TestSavePromptTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewSavePromptTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_save_prompt definition missing 'namespace' parameter")
+	}
+}
+
+func TestSessionSummaryTool_WithNamespace(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewSessionSummaryTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"content":   "## Goal\nImplement auth",
+		"project":   "my-app",
+		"namespace": "subagent/coder",
+	}))
+
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Session summary saved") {
+		t.Errorf("expected success, got: %s", text)
+	}
+}
+
+func TestSessionSummaryTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewSessionSummaryTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_session_summary definition missing 'namespace' parameter")
+	}
+}
+
+func TestProgressTool_WithNamespace(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewProgressTool(store)
+
+	// Write progress with namespace
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":   "my-app",
+		"content":   `{"goal":"implement auth","completed":["login"],"next_steps":["logout"]}`,
+		"namespace": "subagent/coder",
+	}))
+	mustNotError(t, r, err)
+
+	// Read progress with same namespace
+	r, err = tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":   "my-app",
+		"namespace": "subagent/coder",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "implement auth") {
+		t.Errorf("expected progress content, got: %s", text)
+	}
+}
+
+func TestProgressTool_NamespaceIsolation(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewProgressTool(store)
+
+	// Write progress for agent/A
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":   "my-app",
+		"content":   `{"goal":"task A"}`,
+		"namespace": "agent/A",
+	}))
+	mustNotError(t, r, err)
+
+	// Write progress for agent/B
+	r, err = tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":   "my-app",
+		"content":   `{"goal":"task B"}`,
+		"namespace": "agent/B",
+	}))
+	mustNotError(t, r, err)
+
+	// Read agent/A → should get task A, not task B
+	r, err = tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":   "my-app",
+		"namespace": "agent/A",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+	if !strings.Contains(text, "task A") {
+		t.Errorf("agent/A should see task A, got: %s", text)
+	}
+	if strings.Contains(text, "task B") {
+		t.Errorf("agent/A should NOT see task B, got: %s", text)
+	}
+}
+
+func TestProgressTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewProgressTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_progress definition missing 'namespace' parameter")
+	}
+}
+
+func TestSearchTool_WithNamespace(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+
+	seedNamespacedObservation(t, store, "NS auth fix", "Fixed auth in namespace A module", "proj", "agent/A")
+	seedNamespacedObservation(t, store, "NS auth research", "Researching auth options for namespace B module", "proj", "agent/B")
+
+	tool := NewSearchTool(store)
+
+	// Search with namespace filter
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query":     "auth namespace",
+		"namespace": "agent/A",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "NS auth fix") {
+		t.Errorf("expected agent/A result, got: %s", text)
+	}
+	if strings.Contains(text, "NS auth research") {
+		t.Errorf("should NOT contain agent/B result, got: %s", text)
+	}
+}
+
+func TestSearchTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewSearchTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_search definition missing 'namespace' parameter")
+	}
+}
+
+func TestContextTool_WithNamespace(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+
+	seedNamespacedObservation(t, store, "Context NS item", "Context namespaced observation content", "proj", "agent/coder")
+	seedObservation(t, store, "Context global item", "Context global observation content", "proj")
+
+	tool := NewContextTool(store)
+
+	// With namespace → only namespaced item
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project":   "proj",
+		"namespace": "agent/coder",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Context NS item") {
+		t.Errorf("expected namespaced context, got: %s", text)
+	}
+}
+
+func TestContextTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewContextTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_context definition missing 'namespace' parameter")
+	}
+}
+
+func TestCompactTool_NamespaceDefinitionParam(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewCompactTool(store)
+	def := tool.Definition()
+
+	if _, ok := def.InputSchema.Properties["namespace"]; !ok {
+		t.Error("mem_compact definition missing 'namespace' parameter")
+	}
+}

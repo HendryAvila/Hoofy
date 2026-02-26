@@ -1,0 +1,31 @@
+{
+  "id": "homebrew-tap-support-for-macos-and-linux",
+  "type": "feature",
+  "size": "small",
+  "description": "Homebrew tap support for macOS and Linux",
+  "stages": [
+    {
+      "name": "describe",
+      "status": "completed",
+      "started_at": "2026-02-24T14:07:56Z",
+      "completed_at": "2026-02-24T14:08:05Z"
+    },
+    {
+      "name": "tasks",
+      "status": "completed",
+      "started_at": "2026-02-24T14:08:05Z",
+      "completed_at": "2026-02-24T14:08:12Z"
+    },
+    {
+      "name": "verify",
+      "status": "completed",
+      "started_at": "2026-02-24T14:08:12Z",
+      "completed_at": "2026-02-24T14:08:58Z"
+    }
+  ],
+  "current_stage": "verify",
+  "adrs": [],
+  "status": "completed",
+  "created_at": "2026-02-24T14:07:56Z",
+  "updated_at": "2026-02-24T14:08:58Z"
+}

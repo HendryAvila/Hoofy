@@ -46,6 +46,7 @@ type Observation struct {
 	Project        *string `json:"project,omitempty"`
 	Scope          string  `json:"scope"`
 	TopicKey       *string `json:"topic_key,omitempty"`
+	Namespace      *string `json:"namespace,omitempty"`
 	RevisionCount  int     `json:"revision_count"`
 	DuplicateCount int     `json:"duplicate_count"`
 	LastSeenAt     *string `json:"last_seen_at,omitempty"`
@@ -129,6 +130,7 @@ type TimelineEntry struct {
 	Project        *string `json:"project,omitempty"`
 	Scope          string  `json:"scope"`
 	TopicKey       *string `json:"topic_key,omitempty"`
+	Namespace      *string `json:"namespace,omitempty"`
 	RevisionCount  int     `json:"revision_count"`
 	DuplicateCount int     `json:"duplicate_count"`
 	LastSeenAt     *string `json:"last_seen_at,omitempty"`
@@ -149,10 +151,11 @@ type TimelineResult struct {
 
 // SearchOptions holds filters for FTS5 search queries.
 type SearchOptions struct {
-	Type    string `json:"type,omitempty"`
-	Project string `json:"project,omitempty"`
-	Scope   string `json:"scope,omitempty"`
-	Limit   int    `json:"limit,omitempty"`
+	Type      string `json:"type,omitempty"`
+	Project   string `json:"project,omitempty"`
+	Scope     string `json:"scope,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
+	Limit     int    `json:"limit,omitempty"`
 }
 
 // AddObservationParams holds the input for creating a new observation.
@@ -165,6 +168,7 @@ type AddObservationParams struct {
 	Project   string `json:"project,omitempty"`
 	Scope     string `json:"scope,omitempty"`
 	TopicKey  string `json:"topic_key,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // UpdateObservationParams holds partial update fields for an observation.
@@ -191,6 +195,7 @@ type AddPromptParams struct {
 	SessionID string `json:"session_id"`
 	Content   string `json:"content"`
 	Project   string `json:"project,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // ExportData is the full serializable dump of the memory database.
@@ -414,6 +419,7 @@ func (s *Store) migrate() error {
 			project         TEXT,
 			scope           TEXT    NOT NULL DEFAULT 'project',
 			topic_key       TEXT,
+			namespace       TEXT,
 			normalized_hash TEXT,
 			revision_count  INTEGER NOT NULL DEFAULT 1,
 			duplicate_count INTEGER NOT NULL DEFAULT 1,
@@ -444,6 +450,7 @@ func (s *Store) migrate() error {
 			session_id TEXT    NOT NULL,
 			content    TEXT    NOT NULL,
 			project    TEXT,
+			namespace  TEXT,
 			created_at TEXT    NOT NULL DEFAULT (datetime('now')),
 			FOREIGN KEY (session_id) REFERENCES sessions(id)
 		);
@@ -503,6 +510,13 @@ func (s *Store) migrate() error {
 	_, _ = s.execHook(s.db, `UPDATE observations SET duplicate_count = 1 WHERE duplicate_count IS NULL OR duplicate_count < 1`) // best-effort migration cleanup
 	_, _ = s.execHook(s.db, `UPDATE observations SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''`)      // best-effort migration cleanup
 	_, _ = s.execHook(s.db, `UPDATE user_prompts SET project = '' WHERE project IS NULL`)                                       // best-effort migration cleanup
+
+	// Namespace column migration — add to existing databases that lack it.
+	// ALTER TABLE ADD COLUMN is safe for SQLite: no-op if column already exists
+	// would error, so we check pragma_table_info first.
+	s.migrateAddColumn("observations", "namespace", "TEXT")
+	s.migrateAddColumn("user_prompts", "namespace", "TEXT")
+	_, _ = s.execHook(s.db, `CREATE INDEX IF NOT EXISTS idx_obs_namespace ON observations(namespace)`)
 
 	// Create FTS triggers (idempotent)
 	var name string
@@ -565,6 +579,20 @@ func (s *Store) migrate() error {
 	}
 
 	return nil
+}
+
+// migrateAddColumn adds a column to an existing table if it doesn't already exist.
+// Uses pragma_table_info to check before ALTER TABLE ADD COLUMN.
+func (s *Store) migrateAddColumn(table, column, colType string) {
+	var count int
+	err := s.db.QueryRow(
+		fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name = ?", table),
+		column,
+	).Scan(&count)
+	if err != nil || count > 0 {
+		return // column already exists or check failed — skip safely
+	}
+	_, _ = s.execHook(s.db, fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s", table, column, colType))
 }
 
 // ─── Sessions ────────────────────────────────────────────────────────────────
@@ -654,19 +682,27 @@ func (s *Store) AddObservation(p AddObservationParams) (int64, error) {
 	normHash := hashNormalized(content)
 	topicKey := normalizeTopicKey(p.TopicKey)
 
+	namespace := nullableString(p.Namespace)
+
 	// Topic key upsert: if topic_key matches, update the existing observation
 	if topicKey != "" {
 		var existingID int64
-		err := s.db.QueryRow(
-			`SELECT id FROM observations
+		upsertQuery := `SELECT id FROM observations
 			 WHERE topic_key = ?
 			   AND ifnull(project, '') = ifnull(?, '')
 			   AND scope = ?
-			   AND deleted_at IS NULL
-			 ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
-			 LIMIT 1`,
-			topicKey, nullableString(p.Project), scope,
-		).Scan(&existingID)
+			   AND deleted_at IS NULL`
+		upsertArgs := []any{topicKey, nullableString(p.Project), scope}
+
+		if p.Namespace != "" {
+			upsertQuery += ` AND namespace = ?`
+			upsertArgs = append(upsertArgs, p.Namespace)
+		} else {
+			upsertQuery += ` AND namespace IS NULL`
+		}
+		upsertQuery += ` ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC LIMIT 1`
+
+		err := s.db.QueryRow(upsertQuery, upsertArgs...).Scan(&existingID)
 		if err == nil {
 			if _, err := s.execHook(s.db,
 				`UPDATE observations
@@ -697,19 +733,25 @@ func (s *Store) AddObservation(p AddObservationParams) (int64, error) {
 	// Deduplication: same content hash within the dedup window
 	window := dedupeWindowExpression(s.cfg.DedupeWindow)
 	var existingID int64
-	err := s.db.QueryRow(
-		`SELECT id FROM observations
+	dedupQuery := `SELECT id FROM observations
 		 WHERE normalized_hash = ?
 		   AND ifnull(project, '') = ifnull(?, '')
 		   AND scope = ?
 		   AND type = ?
 		   AND title = ?
 		   AND deleted_at IS NULL
-		   AND datetime(created_at) >= datetime('now', ?)
-		 ORDER BY created_at DESC
-		 LIMIT 1`,
-		normHash, nullableString(p.Project), scope, p.Type, title, window,
-	).Scan(&existingID)
+		   AND datetime(created_at) >= datetime('now', ?)`
+	dedupArgs := []any{normHash, nullableString(p.Project), scope, p.Type, title, window}
+
+	if p.Namespace != "" {
+		dedupQuery += ` AND namespace = ?`
+		dedupArgs = append(dedupArgs, p.Namespace)
+	} else {
+		dedupQuery += ` AND namespace IS NULL`
+	}
+	dedupQuery += ` ORDER BY created_at DESC LIMIT 1`
+
+	err := s.db.QueryRow(dedupQuery, dedupArgs...).Scan(&existingID)
 	if err == nil {
 		if _, err := s.execHook(s.db,
 			`UPDATE observations
@@ -729,10 +771,10 @@ func (s *Store) AddObservation(p AddObservationParams) (int64, error) {
 
 	// Insert new observation
 	res, err := s.execHook(s.db,
-		`INSERT INTO observations (session_id, type, title, content, tool_name, project, scope, topic_key, normalized_hash, revision_count, duplicate_count, last_seen_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))`,
+		`INSERT INTO observations (session_id, type, title, content, tool_name, project, scope, topic_key, namespace, normalized_hash, revision_count, duplicate_count, last_seen_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))`,
 		p.SessionID, p.Type, title, content,
-		nullableString(p.ToolName), nullableString(p.Project), scope, nullableString(topicKey), normHash,
+		nullableString(p.ToolName), nullableString(p.Project), scope, nullableString(topicKey), namespace, normHash,
 	)
 	if err != nil {
 		return 0, err
@@ -740,15 +782,15 @@ func (s *Store) AddObservation(p AddObservationParams) (int64, error) {
 	return res.LastInsertId()
 }
 
-// RecentObservations returns recent observations filtered by project and scope.
-func (s *Store) RecentObservations(project, scope string, limit int) ([]Observation, error) {
+// RecentObservations returns recent observations filtered by project, scope, and namespace.
+func (s *Store) RecentObservations(project, scope, namespace string, limit int) ([]Observation, error) {
 	if limit <= 0 {
 		limit = s.cfg.MaxContextResults
 	}
 
 	query := `
 		SELECT o.id, o.session_id, o.type, o.title, o.content, o.tool_name, o.project,
-		       o.scope, o.topic_key, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at
+		       o.scope, o.topic_key, o.namespace, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at
 		FROM observations o
 		WHERE o.deleted_at IS NULL
 	`
@@ -762,6 +804,10 @@ func (s *Store) RecentObservations(project, scope string, limit int) ([]Observat
 		query += " AND o.scope = ?"
 		args = append(args, normalizeScope(scope))
 	}
+	if namespace != "" {
+		query += " AND o.namespace = ?"
+		args = append(args, namespace)
+	}
 
 	query += " ORDER BY o.created_at DESC LIMIT ?"
 	args = append(args, limit)
@@ -770,9 +816,9 @@ func (s *Store) RecentObservations(project, scope string, limit int) ([]Observat
 }
 
 // CountObservations returns the total number of non-deleted observations
-// matching the given project and scope filters. Used for "Showing X of Y"
+// matching the given project, scope, and namespace filters. Used for "Showing X of Y"
 // navigation hints when results are capped by a limit.
-func (s *Store) CountObservations(project, scope string) (int, error) {
+func (s *Store) CountObservations(project, scope, namespace string) (int, error) {
 	query := `SELECT COUNT(*) FROM observations WHERE deleted_at IS NULL`
 	args := []any{}
 
@@ -784,6 +830,10 @@ func (s *Store) CountObservations(project, scope string) (int, error) {
 		query += " AND scope = ?"
 		args = append(args, normalizeScope(scope))
 	}
+	if namespace != "" {
+		query += " AND namespace = ?"
+		args = append(args, namespace)
+	}
 
 	var count int
 	err := s.db.QueryRow(query, args...).Scan(&count)
@@ -794,13 +844,13 @@ func (s *Store) CountObservations(project, scope string) (int, error) {
 func (s *Store) GetObservation(id int64) (*Observation, error) {
 	row := s.db.QueryRow(
 		`SELECT id, session_id, type, title, content, tool_name, project,
-		        scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
+		        scope, topic_key, namespace, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
 		 FROM observations WHERE id = ? AND deleted_at IS NULL`, id,
 	)
 	var o Observation
 	if err := row.Scan(
 		&o.ID, &o.SessionID, &o.Type, &o.Title, &o.Content,
-		&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
+		&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.Namespace, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
 		&o.CreatedAt, &o.UpdatedAt, &o.DeletedAt,
 	); err != nil {
 		return nil, err
@@ -820,7 +870,7 @@ func (s *Store) FindByTopicKey(topicKey, project, scope string) (*Observation, e
 
 	row := s.db.QueryRow(
 		`SELECT id, session_id, type, title, content, tool_name, project,
-		        scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
+		        scope, topic_key, namespace, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
 		 FROM observations
 		 WHERE topic_key = ?
 		   AND ifnull(project, '') = ifnull(?, '')
@@ -833,7 +883,7 @@ func (s *Store) FindByTopicKey(topicKey, project, scope string) (*Observation, e
 	var o Observation
 	if err := row.Scan(
 		&o.ID, &o.SessionID, &o.Type, &o.Title, &o.Content,
-		&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
+		&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.Namespace, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
 		&o.CreatedAt, &o.UpdatedAt, &o.DeletedAt,
 	); err != nil {
 		if err == sql.ErrNoRows {
@@ -947,7 +997,7 @@ type CompactResult struct {
 // FindStaleObservations returns non-deleted observations older than the
 // specified number of days, filtered by project and scope. Results are
 // ordered oldest-first so the caller can prioritize the stalest entries.
-func (s *Store) FindStaleObservations(project, scope string, olderThanDays, limit int) ([]Observation, error) {
+func (s *Store) FindStaleObservations(project, scope, namespace string, olderThanDays, limit int) ([]Observation, error) {
 	if olderThanDays <= 0 {
 		return nil, fmt.Errorf("olderThanDays must be > 0, got %d", olderThanDays)
 	}
@@ -960,7 +1010,7 @@ func (s *Store) FindStaleObservations(project, scope string, olderThanDays, limi
 
 	query := `
 		SELECT o.id, o.session_id, o.type, o.title, o.content, o.tool_name, o.project,
-		       o.scope, o.topic_key, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at
+		       o.scope, o.topic_key, o.namespace, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at
 		FROM observations o
 		WHERE o.deleted_at IS NULL
 		  AND datetime(o.created_at) < datetime('now', ?)
@@ -974,6 +1024,10 @@ func (s *Store) FindStaleObservations(project, scope string, olderThanDays, limi
 	if scope != "" {
 		query += " AND o.scope = ?"
 		args = append(args, normalizeScope(scope))
+	}
+	if namespace != "" {
+		query += " AND o.namespace = ?"
+		args = append(args, namespace)
 	}
 
 	query += " ORDER BY o.created_at ASC LIMIT ?"
@@ -1000,7 +1054,7 @@ func (s *Store) CompactObservations(p CompactParams) (*CompactResult, error) {
 	scope := normalizeScope(p.Scope)
 
 	// Count before compaction
-	totalBefore, err := s.CountObservations(p.Project, scope)
+	totalBefore, err := s.CountObservations(p.Project, scope, "")
 	if err != nil {
 		return nil, fmt.Errorf("counting observations before compaction: %w", err)
 	}
@@ -1058,7 +1112,7 @@ func (s *Store) CompactObservations(p CompactParams) (*CompactResult, error) {
 	}
 
 	// Count after compaction (outside tx, reads committed state)
-	totalAfter, err := s.CountObservations(p.Project, scope)
+	totalAfter, err := s.CountObservations(p.Project, scope, "")
 	if err != nil {
 		return nil, fmt.Errorf("counting observations after compaction: %w", err)
 	}
@@ -1303,8 +1357,8 @@ func (s *Store) AddPrompt(p AddPromptParams) (int64, error) {
 	}
 
 	res, err := s.execHook(s.db,
-		`INSERT INTO user_prompts (session_id, content, project) VALUES (?, ?, ?)`,
-		p.SessionID, content, nullableString(p.Project),
+		`INSERT INTO user_prompts (session_id, content, project, namespace) VALUES (?, ?, ?, ?)`,
+		p.SessionID, content, nullableString(p.Project), nullableString(p.Namespace),
 	)
 	if err != nil {
 		return 0, err
@@ -1411,7 +1465,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 	// Get observations BEFORE the focus (same session, older)
 	beforeRows, err := s.queryItHook(s.db, `
 		SELECT id, session_id, type, title, content, tool_name, project,
-		       scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
+		       scope, topic_key, namespace, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
 		FROM observations
 		WHERE session_id = ? AND id < ? AND deleted_at IS NULL
 		ORDER BY id DESC
@@ -1427,7 +1481,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 		var e TimelineEntry
 		if err := beforeRows.Scan(
 			&e.ID, &e.SessionID, &e.Type, &e.Title, &e.Content,
-			&e.ToolName, &e.Project, &e.Scope, &e.TopicKey, &e.RevisionCount, &e.DuplicateCount, &e.LastSeenAt,
+			&e.ToolName, &e.Project, &e.Scope, &e.TopicKey, &e.Namespace, &e.RevisionCount, &e.DuplicateCount, &e.LastSeenAt,
 			&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
 		); err != nil {
 			return nil, err
@@ -1445,7 +1499,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 	// Get observations AFTER the focus (same session, newer)
 	afterRows, err := s.queryItHook(s.db, `
 		SELECT id, session_id, type, title, content, tool_name, project,
-		       scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
+		       scope, topic_key, namespace, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
 		FROM observations
 		WHERE session_id = ? AND id > ? AND deleted_at IS NULL
 		ORDER BY id ASC
@@ -1461,7 +1515,7 @@ func (s *Store) Timeline(observationID int64, before, after int) (*TimelineResul
 		var e TimelineEntry
 		if err := afterRows.Scan(
 			&e.ID, &e.SessionID, &e.Type, &e.Title, &e.Content,
-			&e.ToolName, &e.Project, &e.Scope, &e.TopicKey, &e.RevisionCount, &e.DuplicateCount, &e.LastSeenAt,
+			&e.ToolName, &e.Project, &e.Scope, &e.TopicKey, &e.Namespace, &e.RevisionCount, &e.DuplicateCount, &e.LastSeenAt,
 			&e.CreatedAt, &e.UpdatedAt, &e.DeletedAt,
 		); err != nil {
 			return nil, err
@@ -1509,7 +1563,7 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 
 	sqlStr := `
 		SELECT o.id, o.session_id, o.type, o.title, o.content, o.tool_name, o.project,
-		       o.scope, o.topic_key, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at,
+		       o.scope, o.topic_key, o.namespace, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at,
 		       fts.rank
 		FROM observations_fts fts
 		JOIN observations o ON o.id = fts.rowid
@@ -1529,6 +1583,10 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 		sqlStr += " AND o.scope = ?"
 		args = append(args, normalizeScope(opts.Scope))
 	}
+	if opts.Namespace != "" {
+		sqlStr += " AND o.namespace = ?"
+		args = append(args, opts.Namespace)
+	}
 
 	sqlStr += " ORDER BY fts.rank LIMIT ?"
 	args = append(args, limit)
@@ -1544,7 +1602,7 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 		var sr SearchResult
 		if err := rows.Scan(
 			&sr.ID, &sr.SessionID, &sr.Type, &sr.Title, &sr.Content,
-			&sr.ToolName, &sr.Project, &sr.Scope, &sr.TopicKey, &sr.RevisionCount, &sr.DuplicateCount,
+			&sr.ToolName, &sr.Project, &sr.Scope, &sr.TopicKey, &sr.Namespace, &sr.RevisionCount, &sr.DuplicateCount,
 			&sr.LastSeenAt, &sr.CreatedAt, &sr.UpdatedAt, &sr.DeletedAt,
 			&sr.Rank,
 		); err != nil {
@@ -1560,7 +1618,7 @@ func (s *Store) Search(query string, opts SearchOptions) ([]SearchResult, error)
 func (s *Store) searchRecent(opts SearchOptions, limit int) ([]SearchResult, error) {
 	sqlStr := `
 		SELECT id, session_id, type, title, content, tool_name, project,
-		       scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at,
+		       scope, topic_key, namespace, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at,
 		       0 AS rank
 		FROM observations
 		WHERE deleted_at IS NULL
@@ -1579,6 +1637,10 @@ func (s *Store) searchRecent(opts SearchOptions, limit int) ([]SearchResult, err
 		sqlStr += " AND scope = ?"
 		args = append(args, normalizeScope(opts.Scope))
 	}
+	if opts.Namespace != "" {
+		sqlStr += " AND namespace = ?"
+		args = append(args, opts.Namespace)
+	}
 
 	sqlStr += " ORDER BY created_at DESC LIMIT ?"
 	args = append(args, limit)
@@ -1594,7 +1656,7 @@ func (s *Store) searchRecent(opts SearchOptions, limit int) ([]SearchResult, err
 		var sr SearchResult
 		if err := rows.Scan(
 			&sr.ID, &sr.SessionID, &sr.Type, &sr.Title, &sr.Content,
-			&sr.ToolName, &sr.Project, &sr.Scope, &sr.TopicKey, &sr.RevisionCount, &sr.DuplicateCount,
+			&sr.ToolName, &sr.Project, &sr.Scope, &sr.TopicKey, &sr.Namespace, &sr.RevisionCount, &sr.DuplicateCount,
 			&sr.LastSeenAt, &sr.CreatedAt, &sr.UpdatedAt, &sr.DeletedAt,
 			&sr.Rank,
 		); err != nil {
@@ -1636,6 +1698,10 @@ func (s *Store) CountSearchResults(query string, opts SearchOptions) (int, error
 		sqlStr += " AND o.scope = ?"
 		args = append(args, normalizeScope(opts.Scope))
 	}
+	if opts.Namespace != "" {
+		sqlStr += " AND o.namespace = ?"
+		args = append(args, opts.Namespace)
+	}
 
 	var count int
 	err := s.db.QueryRow(sqlStr, args...).Scan(&count)
@@ -1658,6 +1724,10 @@ func (s *Store) countRecentResults(opts SearchOptions) (int, error) {
 	if opts.Scope != "" {
 		sqlStr += " AND scope = ?"
 		args = append(args, normalizeScope(opts.Scope))
+	}
+	if opts.Namespace != "" {
+		sqlStr += " AND namespace = ?"
+		args = append(args, opts.Namespace)
 	}
 
 	var count int
@@ -1701,6 +1771,9 @@ type ContextFormatOptions struct {
 	// Limit overrides the number of observations to retrieve.
 	// 0 means use the configured default (MaxContextResults).
 	Limit int
+	// Namespace filters observations to a specific sub-agent namespace.
+	// Empty means no namespace filter (see all).
+	Namespace string
 }
 
 // FormatContext returns a markdown-formatted summary of recent memory.
@@ -1724,7 +1797,7 @@ func (s *Store) FormatContextDetailed(project, scope string, opts ContextFormatO
 		return "", err
 	}
 
-	observations, err := s.RecentObservations(project, scope, obsLimit)
+	observations, err := s.RecentObservations(project, scope, opts.Namespace, obsLimit)
 	if err != nil {
 		return "", err
 	}
@@ -1888,7 +1961,7 @@ func (s *Store) Export() (*ExportData, error) {
 	// Observations
 	obsRows, err := s.queryItHook(s.db,
 		`SELECT id, session_id, type, title, content, tool_name, project,
-		        scope, topic_key, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
+		        scope, topic_key, namespace, revision_count, duplicate_count, last_seen_at, created_at, updated_at, deleted_at
 		 FROM observations ORDER BY id`,
 	)
 	if err != nil {
@@ -1899,7 +1972,7 @@ func (s *Store) Export() (*ExportData, error) {
 		var o Observation
 		if err := obsRows.Scan(
 			&o.ID, &o.SessionID, &o.Type, &o.Title, &o.Content,
-			&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
+			&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.Namespace, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
 			&o.CreatedAt, &o.UpdatedAt, &o.DeletedAt,
 		); err != nil {
 			return nil, err
@@ -2127,7 +2200,7 @@ func (s *Store) queryObservations(query string, args ...any) ([]Observation, err
 		var o Observation
 		if err := rows.Scan(
 			&o.ID, &o.SessionID, &o.Type, &o.Title, &o.Content,
-			&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
+			&o.ToolName, &o.Project, &o.Scope, &o.TopicKey, &o.Namespace, &o.RevisionCount, &o.DuplicateCount, &o.LastSeenAt,
 			&o.CreatedAt, &o.UpdatedAt, &o.DeletedAt,
 		); err != nil {
 			return nil, err

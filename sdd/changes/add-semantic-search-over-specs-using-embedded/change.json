@@ -1,0 +1,38 @@
+{
+  "id": "add-semantic-search-over-specs-using-embedded",
+  "type": "feature",
+  "size": "large",
+  "description": "Add semantic search over specs using embedded vector search",
+  "stages": [
+    {
+      "name": "propose",
+      "status": "in_progress",
+      "started_at": "2026-02-24T16:51:15Z"
+    },
+    {
+      "name": "spec",
+      "status": "pending"
+    },
+    {
+      "name": "clarify",
+      "status": "pending"
+    },
+    {
+      "name": "design",
+      "status": "pending"
+    },
+    {
+      "name": "tasks",
+      "status": "pending"
+    },
+    {
+      "name": "verify",
+      "status": "pending"
+    }
+  ],
+  "current_stage": "propose",
+  "adrs": [],
+  "status": "cancelled",
+  "created_at": "2026-02-24T16:51:15Z",
+  "updated_at": "2026-02-24T16:51:15Z"
+}

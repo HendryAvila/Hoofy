@@ -25,7 +25,11 @@ func NewProgressTool(store *memory.Store) *ProgressTool {
 }
 
 // progressTopicKey returns the canonical topic key for a project's progress doc.
-func progressTopicKey(project string) string {
+// When namespace is non-empty, the key includes it for namespace isolation.
+func progressTopicKey(project, namespace string) string {
+	if namespace != "" {
+		return "progress/" + namespace + "/" + project
+	}
 	return "progress/" + project
 }
 
@@ -52,6 +56,9 @@ func (t *ProgressTool) Definition() mcp.Tool {
 		mcp.WithString("session_id",
 			mcp.Description("Session ID to associate with (default: manual-save)"),
 		),
+		mcp.WithString("namespace",
+			mcp.Description("Optional sub-agent namespace for memory isolation (e.g. 'subagent/task-123', 'agent/researcher'). When set, progress is scoped per namespace."),
+		),
 	)
 }
 
@@ -63,16 +70,17 @@ func (t *ProgressTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	}
 
 	content := req.GetString("content", "")
+	namespace := req.GetString("namespace", "")
 
 	if content == "" {
-		return t.handleRead(project)
+		return t.handleRead(project, namespace)
 	}
-	return t.handleWrite(project, content, req.GetString("session_id", "manual-save"))
+	return t.handleWrite(project, content, req.GetString("session_id", "manual-save"), namespace)
 }
 
 // handleRead retrieves the current progress document for a project.
-func (t *ProgressTool) handleRead(project string) (*mcp.CallToolResult, error) {
-	topicKey := progressTopicKey(project)
+func (t *ProgressTool) handleRead(project, namespace string) (*mcp.CallToolResult, error) {
+	topicKey := progressTopicKey(project, namespace)
 	obs, err := t.store.FindByTopicKey(topicKey, project, "project")
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to read progress: %v", err)), nil
@@ -92,7 +100,7 @@ func (t *ProgressTool) handleRead(project string) (*mcp.CallToolResult, error) {
 }
 
 // handleWrite validates and saves a JSON progress document.
-func (t *ProgressTool) handleWrite(project, content, sessionID string) (*mcp.CallToolResult, error) {
+func (t *ProgressTool) handleWrite(project, content, sessionID, namespace string) (*mcp.CallToolResult, error) {
 	// Validate JSON
 	if !json.Valid([]byte(content)) {
 		return mcp.NewToolResultError(
@@ -101,7 +109,7 @@ func (t *ProgressTool) handleWrite(project, content, sessionID string) (*mcp.Cal
 		), nil
 	}
 
-	topicKey := progressTopicKey(project)
+	topicKey := progressTopicKey(project, namespace)
 	id, err := t.store.AddObservation(memory.AddObservationParams{
 		SessionID: sessionID,
 		Type:      "progress",
@@ -110,6 +118,7 @@ func (t *ProgressTool) handleWrite(project, content, sessionID string) (*mcp.Cal
 		Project:   project,
 		Scope:     "project",
 		TopicKey:  topicKey,
+		Namespace: namespace,
 	})
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to save progress: %v", err)), nil
