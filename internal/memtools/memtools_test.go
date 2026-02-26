@@ -49,6 +49,172 @@ func resultText(r *mcp.CallToolResult) string {
 	return ""
 }
 
+// ─── ProgressTool Tests ──────────────────────────────────────────────────────
+
+func TestProgressTool_Definition(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewProgressTool(store)
+	def := tool.Definition()
+
+	if def.Name != "mem_progress" {
+		t.Errorf("tool name = %q, want %q", def.Name, "mem_progress")
+	}
+
+	props := def.InputSchema.Properties
+	if _, ok := props["project"]; !ok {
+		t.Error("missing 'project' parameter")
+	}
+	if _, ok := props["content"]; !ok {
+		t.Error("missing 'content' parameter")
+	}
+	if _, ok := props["session_id"]; !ok {
+		t.Error("missing 'session_id' parameter")
+	}
+
+	// project should be required
+	required := def.InputSchema.Required
+	found := false
+	for _, r := range required {
+		if r == "project" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("'project' should be required")
+	}
+}
+
+func TestProgressTool_ReadEmpty(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewProgressTool(store)
+
+	result, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "test-project",
+	}))
+	mustNotError(t, result, err)
+
+	text := resultText(result)
+	if !strings.Contains(text, "No progress document found") {
+		t.Errorf("expected 'no progress' message, got: %s", text)
+	}
+	if !strings.Contains(text, "test-project") {
+		t.Error("response should include project name")
+	}
+}
+
+func TestProgressTool_WriteAndRead(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewProgressTool(store)
+
+	progressJSON := `{"goal":"Implement F2","completed":["TASK-001"],"next_steps":["TASK-002"],"blockers":[]}`
+
+	// Write
+	result, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "hoofy",
+		"content": progressJSON,
+	}))
+	mustNotError(t, result, err)
+
+	text := resultText(result)
+	if !strings.Contains(text, "Progress updated") {
+		t.Errorf("expected 'Progress updated', got: %s", text)
+	}
+	if !strings.Contains(text, "hoofy") {
+		t.Error("response should include project name")
+	}
+
+	// Read it back
+	result, err = tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "hoofy",
+	}))
+	mustNotError(t, result, err)
+
+	text = resultText(result)
+	if !strings.Contains(text, "Implement F2") {
+		t.Errorf("read should return saved progress content, got: %s", text)
+	}
+	if !strings.Contains(text, "# Progress: hoofy") {
+		t.Error("read should include progress header")
+	}
+	if !strings.Contains(text, "Revisions:") {
+		t.Error("read should include metadata footer")
+	}
+}
+
+func TestProgressTool_InvalidJSON(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewProgressTool(store)
+
+	result, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "hoofy",
+		"content": "this is not JSON {{{",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected Go error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected tool error for invalid JSON")
+	}
+
+	text := resultText(result)
+	if !strings.Contains(text, "valid JSON") {
+		t.Errorf("error should mention JSON validity, got: %s", text)
+	}
+}
+
+func TestProgressTool_MissingProject(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewProgressTool(store)
+
+	result, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{}))
+	if err != nil {
+		t.Fatalf("unexpected Go error: %v", err)
+	}
+	if !result.IsError {
+		t.Fatal("expected tool error for missing project")
+	}
+
+	text := resultText(result)
+	if !strings.Contains(text, "project") {
+		t.Errorf("error should mention 'project', got: %s", text)
+	}
+}
+
+func TestProgressTool_Upsert(t *testing.T) {
+	store := newTestStore(t)
+	seedManualSession(t, store)
+	tool := NewProgressTool(store)
+
+	// First write
+	result1, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "hoofy",
+		"content": `{"goal":"First goal","completed":[],"next_steps":["start"],"blockers":[]}`,
+	}))
+	mustNotError(t, result1, err)
+
+	// Second write — should upsert (same observation, updated content)
+	result2, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "hoofy",
+		"content": `{"goal":"Updated goal","completed":["start"],"next_steps":["finish"],"blockers":[]}`,
+	}))
+	mustNotError(t, result2, err)
+
+	// Read — should return the UPDATED content, not the first
+	result, err := tool.Handle(context.Background(), makeReq(map[string]interface{}{
+		"project": "hoofy",
+	}))
+	mustNotError(t, result, err)
+
+	text := resultText(result)
+	if !strings.Contains(text, "Updated goal") {
+		t.Errorf("upsert should show updated content, got: %s", text)
+	}
+	if strings.Contains(text, "First goal") {
+		t.Error("upsert should have replaced the first progress doc")
+	}
+}
+
 // mustNotError asserts the Handle call returns no Go error and no tool error.
 func mustNotError(t *testing.T, r *mcp.CallToolResult, err error) {
 	t.Helper()

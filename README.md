@@ -40,7 +40,7 @@ Hoofy is three systems in one MCP server:
 | **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Now includes a **context-check** stage in every flow. | 5 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate and **business rules extraction** that blocks hallucinations. | 9 `sdd_*` tools |
 
-One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode. **32 tools total.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode. **33 tools total.**
 
 ### Why Hoofy?
 
@@ -104,7 +104,7 @@ flowchart TB
     style C5 fill:#10b981,stroke:#059669,color:#fff
 ```
 
-> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (32 tools)](docs/tool-reference.md)**
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (33 tools)](docs/tool-reference.md)**
 
 ---
 
@@ -154,7 +154,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
- > The **MCP server** is Hoofy itself — the binary you just installed. It provides 32 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
+ > The **MCP server** is Hoofy itself — the binary you just installed. It provides 33 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
 >

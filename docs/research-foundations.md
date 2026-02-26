@@ -10,7 +10,7 @@ Foundational patterns for agent design. Distinguishes workflows from agents, int
 
 | Recommendation | Hoofy Implementation |
 |---|---|
-| "Agent-Computer Interface (ACI) is as important as HCI" — tool descriptions and parameters are critical for AI usability | All 32 tools use consistent `sdd_*` and `mem_*` namespacing with self-documenting parameter descriptions |
+| "Agent-Computer Interface (ACI) is as important as HCI" — tool descriptions and parameters are critical for AI usability | All 33 tools use consistent `sdd_*` and `mem_*` namespacing with self-documenting parameter descriptions |
 | "Do the simplest thing that works" — avoid over-engineering agent systems | Adaptive change pipeline selects only the stages needed (4-7 stages based on type x size), instead of forcing a one-size-fits-all workflow |
 | Orchestrator-worker pattern for complex tasks | Project pipeline uses sequential orchestration: propose → specify → clarify → design → tasks → validate |
 | Evaluator-optimizer pattern for iterative refinement | Clarity Gate blocks pipeline advancement until clarity score meets threshold, forcing iterative requirement refinement |
@@ -33,7 +33,7 @@ Direct guidance on tool design for AI agents. Covers namespacing, consolidation,
 
 | Recommendation | Hoofy Implementation |
 |---|---|
-| "Namespacing tools with prefixes helps delineate boundaries" | `mem_*` (17 memory tools), `sdd_*` (9 project pipeline tools), `sdd_change*` (5 change tools) — clear boundaries between systems |
+| "Namespacing tools with prefixes helps delineate boundaries" | `mem_*` (18 memory tools), `sdd_*` (9 project pipeline tools), `sdd_change*` (5 change tools) — clear boundaries between systems |
 | "Return only high-signal information, avoid cryptic UUIDs" | Tool responses include human-readable summaries, not raw database rows. `detail_level` parameter lets the AI request only the verbosity needed |
 | "Tools should be self-contained, robust to error, extremely clear" | Each tool has comprehensive parameter descriptions with examples in the tool definition |
 
@@ -53,8 +53,8 @@ Solutions for agents that work across multiple context windows. Introduces the i
 
 | Recommendation | Hoofy Implementation |
 |---|---|
-| "Each session: read progress, read git log, run basic test, then start new work" | `mem_context` retrieves recent sessions and observations at session start. Server instructions guide the AI to check memory before starting work |
-| "Feature list in JSON (not Markdown) — model less likely to inappropriately change JSON" | Pipeline state persisted in `sdd/sdd.json` (JSON), not markdown. Stage status machine-managed, not model-managed |
+| "Each session: read progress, read git log, run basic test, then start new work" | `mem_progress` persists structured JSON progress docs that survive context compaction. Auto-read at session start, upserted during work. One active progress per project via topic_key. `mem_context` provides recent observations for broader session context |
+| "Feature list in JSON (not Markdown) — model less likely to inappropriately change JSON" | Pipeline state persisted in `sdd/sdd.json` (JSON), not markdown. `mem_progress` content is validated JSON — the model is less likely to corrupt structured data than free-form markdown |
 | "Agent commits to git with descriptive messages after each feature" | Change pipeline enforces incremental delivery: one active change at a time, verify stage before completion |
 | "Initializer agent sets up environment on first run" | `sdd_init_project` creates the `sdd/` directory structure, `sdd.json` config, and templates — environment scaffolding before any work begins |
 

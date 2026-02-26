@@ -174,7 +174,7 @@ func New() (*server.MCPServer, func(), error) {
 // is disabled or hasn't been initialized.
 func noop() {}
 
-// registerMemoryTools registers all 17 memory MCP tools with the server.
+// registerMemoryTools registers all 18 memory MCP tools with the server.
 func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 	// --- Session lifecycle ---
 	sessionStart := memtools.NewSessionStartTool(ms)
@@ -195,6 +195,10 @@ func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 
 	passiveCapture := memtools.NewPassiveCaptureTool(ms)
 	s.AddTool(passiveCapture.Definition(), passiveCapture.Handle)
+
+	// --- Progress tracking ---
+	progressTool := memtools.NewProgressTool(ms)
+	s.AddTool(progressTool.Definition(), progressTool.Handle)
 
 	// --- Query & retrieval ---
 	searchTool := memtools.NewSearchTool(ms)
@@ -465,6 +469,24 @@ Use the type parameter: decision, architecture, bugfix, pattern, config, discove
 2. Save observations throughout the session (decisions, fixes, discoveries)
 3. Call mem_session_summary with a structured summary (Goal/Instructions/Discoveries/Accomplished/Files)
 4. Call mem_session_end to close the session
+
+### Progress Tracking (mem_progress)
+Use mem_progress to persist a structured work-in-progress document that survives context compaction.
+Unlike session summaries (end-of-session), progress tracks WHERE YOU ARE mid-session.
+
+**Dual behavior**:
+- Read: mem_progress(project="X") — returns current progress (call at session start!)
+- Write: mem_progress(project="X", content=JSON) — upserts the progress doc
+
+**When to use**:
+- At session start: read progress to check for prior WIP
+- After completing significant work: update with current state
+- Before context compaction: save progress so the next window can continue
+
+**Content must be valid JSON.** Recommended structure:
+{"goal": "...", "completed": ["..."], "next_steps": ["..."], "blockers": ["..."]}
+
+One active progress per project — each write replaces the previous one.
 
 ### Topic Keys for Evolving Observations
 Use topic_key when an observation should UPDATE over time (not create duplicates):

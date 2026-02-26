@@ -1,10 +1,10 @@
 # Tool Reference
 
-Hoofy exposes **32 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
+Hoofy exposes **33 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
 
 ---
 
-## Memory (17 tools)
+## Memory (18 tools)
 
 Persistent context across sessions. SQLite + FTS5 full-text search with a knowledge graph for connecting observations.
 
@@ -27,6 +27,7 @@ Persistent context across sessions. SQLite + FTS5 full-text search with a knowle
 | `mem_delete` | Remove an observation |
 | `mem_update` | Update an existing observation |
 | `mem_suggest_topic_key` | Suggest stable key for upserts (evolving knowledge) |
+| `mem_progress` | Read/write structured JSON progress doc for long-running sessions (one per project, auto-upserted) |
 
 ## Change Pipeline (6 tools)
 
