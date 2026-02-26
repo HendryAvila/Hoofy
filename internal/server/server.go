@@ -798,5 +798,52 @@ include execution wave assignments to enable parallel execution:
 - Wave 2: tasks that depend only on Wave 1 tasks (can run in parallel with each other)
 - Continue for Wave 3, 4, etc.
 - Format as a clear section in the tasks content (e.g., "## Execution Waves")
-- For the project pipeline, use the wave_assignments parameter in sdd_create_tasks`
+- For the project pipeline, use the wave_assignments parameter in sdd_create_tasks
+
+### Wave Execution — Multi-Agent Orchestration
+When the user asks you to IMPLEMENT tasks that have wave assignments, use this strategy
+to execute them efficiently. Adapt based on your available capabilities:
+
+**Step 1 — Detect your orchestration tier:**
+- **Tier 1 (Agent Teams)**: You can create a team of independent agents with a shared task list,
+  inter-agent communication, and dependency-aware task claiming. Agents coordinate among themselves.
+- **Tier 2 (Sub-Agents)**: You can launch parallel worker agents that execute independently and
+  report results back to you (the caller). Workers cannot communicate with each other.
+- **Tier 3 (Sequential)**: You have no parallelization capability. You execute tasks one by one.
+
+If you are unsure which tier you support, ASK THE USER before proceeding.
+
+**Step 2 — Execute by tier:**
+
+Tier 1 (Agent Teams):
+1. Create a team with enough agents to cover the largest wave
+2. Map each TASK from the wave assignments to a task in the shared task list
+3. Set task dependencies matching the dependency graph — blocked tasks auto-unblock when dependencies complete
+4. Let agents self-claim and execute tasks. Wave boundaries are enforced by the dependency graph itself.
+5. Each agent should use the namespace parameter on memory tools (e.g., namespace="agent/<task-id>")
+   to isolate its observations. The orchestrator reads without namespace to see all progress.
+6. Use mem_progress to track overall wave completion state
+
+Tier 2 (Sub-Agents):
+1. Start with Wave 1 — launch one sub-agent per task in the wave, all in parallel
+2. Wait for ALL sub-agents in the wave to complete before starting the next wave
+3. NEVER start Wave N+1 until every task in Wave N has succeeded
+4. Each sub-agent should use namespace="subagent/<task-id>" on memory tools for isolation
+5. After each wave, check results and update mem_progress before launching the next wave
+6. If a sub-agent fails, stop and report — do not continue to the next wave
+
+Tier 3 (Sequential):
+1. Execute tasks in dependency graph order (not wave order — follow the actual dependencies)
+2. Complete each task fully before starting the next
+3. Use mem_progress to checkpoint after each task completion
+4. If a task fails, stop and report
+
+**Step 3 — Prevent file conflicts:**
+Tasks within the same wave MUST NOT modify the same files. If the task breakdown has
+overlapping file ownership in the same wave, flag this to the user before executing.
+This applies to Tier 1 and Tier 2 only (Tier 3 is sequential, so no conflicts).
+
+**Step 4 — Report completion:**
+After all waves complete, provide a summary: which tasks succeeded, which failed,
+total time if available, and any issues encountered during execution.`
 }

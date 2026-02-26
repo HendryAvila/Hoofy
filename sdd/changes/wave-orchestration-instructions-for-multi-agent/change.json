@@ -1,0 +1,37 @@
+{
+  "id": "wave-orchestration-instructions-for-multi-agent",
+  "type": "enhancement",
+  "size": "small",
+  "description": "Wave orchestration instructions for multi-agent execution",
+  "stages": [
+    {
+      "name": "describe",
+      "status": "completed",
+      "started_at": "2026-02-26T23:27:33Z",
+      "completed_at": "2026-02-26T23:27:48Z"
+    },
+    {
+      "name": "context-check",
+      "status": "completed",
+      "started_at": "2026-02-26T23:27:48Z",
+      "completed_at": "2026-02-26T23:28:19Z"
+    },
+    {
+      "name": "tasks",
+      "status": "completed",
+      "started_at": "2026-02-26T23:28:19Z",
+      "completed_at": "2026-02-26T23:28:37Z"
+    },
+    {
+      "name": "verify",
+      "status": "completed",
+      "started_at": "2026-02-26T23:28:37Z",
+      "completed_at": "2026-02-26T23:29:47Z"
+    }
+  ],
+  "current_stage": "verify",
+  "adrs": [],
+  "status": "completed",
+  "created_at": "2026-02-26T23:27:33Z",
+  "updated_at": "2026-02-26T23:29:47Z"
+}
