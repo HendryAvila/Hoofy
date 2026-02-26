@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/logo.png" alt="Hoofy" width="280" />
+  <img src="assets/logo.png" alt="Hoofy — AI development companion MCP server with persistent memory and spec-driven development" width="280" />
 </p>
 
 <h1 align="center">Hoofy</h1>
 
 <p align="center">
-  <strong>Your AI development companion.</strong><br>
+  <strong>The AI coding assistant that remembers everything and never hallucinates specs.</strong><br>
   An MCP server that gives your AI persistent memory, structured specifications,<br>
   and adaptive change management — so it builds what you actually want.
 </p>
@@ -18,9 +18,18 @@
   <a href="https://github.com/HendryAvila/Hoofy/releases"><img src="https://img.shields.io/github/v/release/HendryAvila/Hoofy?include_prereleases" alt="Release"></a>
 </p>
 
+<p align="center">
+  <a href="https://hendrycode.xyz/blog/2026/2/25/hoofy-tu-companion-de-desarrollo-con-ia-que-no-te-deja-cortar-camino/">Blog Post</a> ·
+  <a href="docs/workflow-guide.md">Workflow Guide</a> ·
+  <a href="docs/tool-reference.md">Tool Reference</a> ·
+  <a href="https://news.ycombinator.com/item?id=47158567">Hacker News</a>
+</p>
+
 ---
 
-## What Hoofy Does
+## What Is Hoofy? — AI Development Companion for MCP
+
+Hoofy is an AI coding tool that solves the three biggest problems with AI-assisted development: **memory loss between sessions**, **hallucinated implementations**, and **unstructured AI workflows**. It's a single [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server written in Go — one binary, zero dependencies — that works with Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode, and any MCP-compatible AI tool.
 
 Hoofy is three systems in one MCP server:
 
@@ -30,7 +39,11 @@ Hoofy is three systems in one MCP server:
 | **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Now includes a **context-check** stage in every flow. | 5 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate and **business rules extraction** that blocks hallucinations. | 9 `sdd_*` tools |
 
-One binary. Zero external dependencies. SQLite embedded at compile time. Works in **any** MCP-compatible AI tool. **32 tools total.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode. **32 tools total.**
+
+### Why Hoofy?
+
+AI coding assistants are powerful but forgetful and overconfident. Studies show experienced developers are [19% slower with unstructured AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) (METR 2025), and AI adoption without structure causes [7.2% delivery instability](https://dora.dev/research/2025/dora-report/) (DORA 2025). Hoofy fixes this by making your AI assistant remember context, follow specifications, and prove it understood before writing code.
 
 ### Key Features
 
