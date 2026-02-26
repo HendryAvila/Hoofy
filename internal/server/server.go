@@ -511,15 +511,24 @@ then drill deeper only when necessary (Anthropic: "context is a finite resource"
 
 **Available levels**:
 - summary: Minimal tokens — IDs, titles, metadata only. Use for orientation and triage.
-- standard (default): Truncated content snippets. Good balance for most operations.
+- standard: Truncated content snippets. Good balance for most operations.
 - full: Complete untruncated content. Use only when you need to analyze details.
+
+**Default detail_level by tool**:
+- sdd_get_context: defaults to summary (minimal pipeline overview)
+- mem_context, mem_search, mem_timeline, sdd_context_check: default to standard
 
 **Tools that support detail_level**:
 - mem_context: Controls observation content in recent memory context
 - mem_search: Controls search result content (summary = titles only, full = complete content)
 - mem_timeline: Controls timeline entries (summary = titles only, full = all content untruncated)
 - sdd_context_check: Controls artifact excerpts and memory results in change reports
-- sdd_get_context: Controls pipeline artifact content (summary = sizes only, full = complete artifacts)
+- sdd_get_context: Controls pipeline artifact content (summary = stage status only, full = complete artifacts)
+
+**Navigation hints**:
+When results are capped by limit, tools append a "📊 Showing X of Y" footer.
+This tells you whether you're seeing everything or need to adjust limits.
+Tools with navigation hints: mem_search, mem_context, mem_timeline.
 
 **Progressive disclosure with detail_level**:
 1. Start with summary to scan what exists (minimal tokens)

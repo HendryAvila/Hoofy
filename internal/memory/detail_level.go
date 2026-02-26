@@ -7,6 +7,8 @@
 //   - full: complete untruncated content for deep analysis
 package memory
 
+import "fmt"
+
 // Detail level constants.
 const (
 	DetailSummary  = "summary"
@@ -34,3 +36,16 @@ func ParseDetailLevel(s string) string {
 // SummaryFooter is appended to summary-mode responses to guide the AI
 // toward progressive disclosure — fetch more detail only when needed.
 const SummaryFooter = "\n---\n💡 Use detail_level: standard or full for more detail."
+
+// NavigationHint returns a one-line footer when results are capped by a limit.
+// Returns an empty string when all results fit (showing >= total) or total is 0.
+// The hint parameter provides tool-specific guidance (e.g., "Use mem_get_observation #ID for full content.").
+func NavigationHint(showing, total int, hint string) string {
+	if total <= 0 || showing >= total {
+		return ""
+	}
+	if hint != "" {
+		return fmt.Sprintf("\n📊 Showing %d of %d. %s", showing, total, hint)
+	}
+	return fmt.Sprintf("\n📊 Showing %d of %d.", showing, total)
+}

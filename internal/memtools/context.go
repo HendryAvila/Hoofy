@@ -68,5 +68,21 @@ func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		formatted += memory.SummaryFooter
 	}
 
+	// Navigation hint when observations are capped by limit.
+	total, err := t.store.CountObservations(project, scope)
+	if err == nil {
+		// Use effective limit: explicit or default (20).
+		effectiveLimit := limit
+		if effectiveLimit <= 0 {
+			effectiveLimit = 20
+		}
+		showing := effectiveLimit
+		if total < showing {
+			showing = total
+		}
+		formatted += memory.NavigationHint(showing, total,
+			"Use mem_search to find specific memories.")
+	}
+
 	return mcp.NewToolResultText(formatted), nil
 }

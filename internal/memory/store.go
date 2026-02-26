@@ -769,6 +769,27 @@ func (s *Store) RecentObservations(project, scope string, limit int) ([]Observat
 	return s.queryObservations(query, args...)
 }
 
+// CountObservations returns the total number of non-deleted observations
+// matching the given project and scope filters. Used for "Showing X of Y"
+// navigation hints when results are capped by a limit.
+func (s *Store) CountObservations(project, scope string) (int, error) {
+	query := `SELECT COUNT(*) FROM observations WHERE deleted_at IS NULL`
+	args := []any{}
+
+	if project != "" {
+		query += " AND project = ?"
+		args = append(args, project)
+	}
+	if scope != "" {
+		query += " AND scope = ?"
+		args = append(args, normalizeScope(scope))
+	}
+
+	var count int
+	err := s.db.QueryRow(query, args...).Scan(&count)
+	return count, err
+}
+
 // GetObservation retrieves a single observation by ID (excludes soft-deleted).
 func (s *Store) GetObservation(id int64) (*Observation, error) {
 	row := s.db.QueryRow(
@@ -1439,6 +1460,66 @@ func (s *Store) searchRecent(opts SearchOptions, limit int) ([]SearchResult, err
 		results = append(results, sr)
 	}
 	return results, rows.Err()
+}
+
+// CountSearchResults returns the total number of observations matching an FTS5
+// query and filters, without applying a LIMIT. Used for "Showing X of Y"
+// navigation hints in mem_search responses.
+func (s *Store) CountSearchResults(query string, opts SearchOptions) (int, error) {
+	ftsQuery := sanitizeFTS(query)
+
+	// Empty query: count all matching observations (no FTS).
+	if ftsQuery == "" {
+		return s.countRecentResults(opts)
+	}
+
+	sqlStr := `
+		SELECT COUNT(*)
+		FROM observations_fts fts
+		JOIN observations o ON o.id = fts.rowid
+		WHERE observations_fts MATCH ? AND o.deleted_at IS NULL
+	`
+	args := []any{ftsQuery}
+
+	if opts.Type != "" {
+		sqlStr += " AND o.type = ?"
+		args = append(args, opts.Type)
+	}
+	if opts.Project != "" {
+		sqlStr += " AND o.project = ?"
+		args = append(args, opts.Project)
+	}
+	if opts.Scope != "" {
+		sqlStr += " AND o.scope = ?"
+		args = append(args, normalizeScope(opts.Scope))
+	}
+
+	var count int
+	err := s.db.QueryRow(sqlStr, args...).Scan(&count)
+	return count, err
+}
+
+// countRecentResults counts matching observations without FTS (fallback for empty queries).
+func (s *Store) countRecentResults(opts SearchOptions) (int, error) {
+	sqlStr := `SELECT COUNT(*) FROM observations WHERE deleted_at IS NULL`
+	var args []any
+
+	if opts.Type != "" {
+		sqlStr += " AND type = ?"
+		args = append(args, opts.Type)
+	}
+	if opts.Project != "" {
+		sqlStr += " AND project = ?"
+		args = append(args, opts.Project)
+	}
+	if opts.Scope != "" {
+		sqlStr += " AND scope = ?"
+		args = append(args, normalizeScope(opts.Scope))
+	}
+
+	var count int
+	err := s.db.QueryRow(sqlStr, args...).Scan(&count)
+	return count, err
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────

@@ -1684,6 +1684,126 @@ func TestIntArg(t *testing.T) {
 	}
 }
 
+// ─── Navigation Hints Tests ──────────────────────────────────────────────────
+
+func TestSearchTool_NavigationHint_WhenCapped(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+
+	// Create 5 observations that all match "auth".
+	for i := 0; i < 5; i++ {
+		seedObservation(t, store, "auth fix "+string(rune('A'+i)), "Fixed auth bug in module "+string(rune('A'+i)), "proj")
+	}
+
+	tool := NewSearchTool(store)
+
+	// Search with limit=2 — should cap results and show navigation hint.
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query": "auth",
+		"limit": float64(2),
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "📊 Showing 2 of 5") {
+		t.Errorf("expected navigation hint 'Showing 2 of 5', got: %s", text)
+	}
+}
+
+func TestSearchTool_NavigationHint_NotShownWhenAllReturned(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+	seedObservation(t, store, "unique topic xyz", "Content about unique topic xyz", "proj")
+
+	tool := NewSearchTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"query": "unique topic xyz",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if strings.Contains(text, "📊 Showing") {
+		t.Errorf("navigation hint should NOT appear when all results returned, got: %s", text)
+	}
+}
+
+func TestContextTool_NavigationHint_WhenCapped(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+
+	// Create 25 observations — exceeds default limit of 20.
+	for i := 0; i < 25; i++ {
+		seedObservation(t, store, "obs "+string(rune('A'+i)), "Content "+string(rune('A'+i)), "proj")
+	}
+
+	tool := NewContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project": "proj",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "📊 Showing 20 of 25") {
+		t.Errorf("expected navigation hint 'Showing 20 of 25', got: %s", text)
+	}
+}
+
+func TestContextTool_NavigationHint_NotShownWhenAllReturned(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+
+	// Create 3 observations — below the default limit.
+	for i := 0; i < 3; i++ {
+		seedObservation(t, store, "obs "+string(rune('A'+i)), "Content "+string(rune('A'+i)), "proj")
+	}
+
+	tool := NewContextTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"project": "proj",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if strings.Contains(text, "📊 Showing") {
+		t.Errorf("navigation hint should NOT appear when all results returned, got: %s", text)
+	}
+}
+
+func TestTimelineTool_NavigationHint_WhenWindowSmaller(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+
+	// Create 15 observations to ensure TotalInRange > window.
+	var focusID int64
+	for i := 0; i < 15; i++ {
+		id := seedObservation(t, store, "timeline obs "+string(rune('A'+i)), "Content for timeline "+string(rune('A'+i)), "proj")
+		if i == 7 {
+			focusID = id
+		}
+	}
+
+	tool := NewTimelineTool(store)
+
+	// Request with before=2, after=2 — window of 5, but TotalInRange is 15.
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"observation_id": float64(focusID),
+		"before":         float64(2),
+		"after":          float64(2),
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "📊 Showing") {
+		t.Errorf("expected navigation hint when window < total, got: %s", text)
+	}
+	if !strings.Contains(text, "Increase before/after") {
+		t.Errorf("expected hint about increasing before/after, got: %s", text)
+	}
+}
+
 func TestBoolArg(t *testing.T) {
 	tests := []struct {
 		name     string

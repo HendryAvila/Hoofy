@@ -1,6 +1,7 @@
 package memory_test
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -1107,6 +1108,136 @@ func TestTimeline_DefaultLimits(t *testing.T) {
 	}
 	if result.Focus.ID != id {
 		t.Errorf("Focus.ID = %d, want %d", result.Focus.ID, id)
+	}
+}
+
+// ─── CountObservations ──────────────────────────────────────────────────────
+
+func TestCountObservations_Empty(t *testing.T) {
+	s := newTestStore(t)
+	count, err := s.CountObservations("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Errorf("CountObservations() = %d, want 0", count)
+	}
+}
+
+func TestCountObservations_WithData(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj-a")
+	ensureSession(t, s, "s2", "proj-b")
+
+	for i := 0; i < 5; i++ {
+		s.AddObservation(memory.AddObservationParams{
+			SessionID: "s1", Type: "manual", Title: fmt.Sprintf("A-%d", i),
+			Content: fmt.Sprintf("Content A %d unique", i), Project: "proj-a",
+		})
+	}
+	for i := 0; i < 3; i++ {
+		s.AddObservation(memory.AddObservationParams{
+			SessionID: "s2", Type: "decision", Title: fmt.Sprintf("B-%d", i),
+			Content: fmt.Sprintf("Content B %d unique", i), Project: "proj-b", Scope: "personal",
+		})
+	}
+
+	// Unfiltered
+	count, _ := s.CountObservations("", "")
+	if count != 8 {
+		t.Errorf("CountObservations('', '') = %d, want 8", count)
+	}
+
+	// Filter by project
+	count, _ = s.CountObservations("proj-a", "")
+	if count != 5 {
+		t.Errorf("CountObservations('proj-a', '') = %d, want 5", count)
+	}
+
+	// Filter by scope
+	count, _ = s.CountObservations("", "personal")
+	if count != 3 {
+		t.Errorf("CountObservations('', 'personal') = %d, want 3", count)
+	}
+
+	// Filter by both
+	count, _ = s.CountObservations("proj-b", "personal")
+	if count != 3 {
+		t.Errorf("CountObservations('proj-b', 'personal') = %d, want 3", count)
+	}
+}
+
+func TestCountObservations_ExcludesSoftDeleted(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	id, _ := s.AddObservation(memory.AddObservationParams{
+		SessionID: "s1", Type: "manual", Title: "Will delete",
+		Content: "To be deleted", Project: "proj",
+	})
+	s.AddObservation(memory.AddObservationParams{
+		SessionID: "s1", Type: "manual", Title: "Keep",
+		Content: "Still here", Project: "proj",
+	})
+	_ = s.DeleteObservation(id, false)
+
+	count, _ := s.CountObservations("proj", "")
+	if count != 1 {
+		t.Errorf("CountObservations after soft-delete = %d, want 1", count)
+	}
+}
+
+// ─── CountSearchResults ─────────────────────────────────────────────────────
+
+func TestCountSearchResults_FTS(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	for i := 0; i < 5; i++ {
+		s.AddObservation(memory.AddObservationParams{
+			SessionID: "s1", Type: "manual", Title: fmt.Sprintf("Alpha-%d", i),
+			Content: fmt.Sprintf("Alpha search target %d unique", i), Project: "proj",
+		})
+	}
+	s.AddObservation(memory.AddObservationParams{
+		SessionID: "s1", Type: "manual", Title: "Beta",
+		Content: "Beta different content", Project: "proj",
+	})
+
+	// Count FTS matches for "Alpha"
+	count, err := s.CountSearchResults("Alpha", memory.SearchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 5 {
+		t.Errorf("CountSearchResults('Alpha') = %d, want 5", count)
+	}
+
+	// Count with project filter
+	count, _ = s.CountSearchResults("Alpha", memory.SearchOptions{Project: "nonexistent"})
+	if count != 0 {
+		t.Errorf("CountSearchResults with nonexistent project = %d, want 0", count)
+	}
+}
+
+func TestCountSearchResults_EmptyQuery(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	for i := 0; i < 3; i++ {
+		s.AddObservation(memory.AddObservationParams{
+			SessionID: "s1", Type: "manual", Title: fmt.Sprintf("Obs-%d", i),
+			Content: fmt.Sprintf("Content %d unique", i), Project: "proj",
+		})
+	}
+
+	// Empty query falls back to count all
+	count, err := s.CountSearchResults("", memory.SearchOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 3 {
+		t.Errorf("CountSearchResults('') = %d, want 3", count)
 	}
 }
 

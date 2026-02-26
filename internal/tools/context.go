@@ -38,10 +38,10 @@ func (t *ContextTool) Definition() mcp.Tool {
 		mcp.WithString("detail_level",
 			mcp.Description(
 				"Level of detail for the overview: "+
-					"'summary' (stage names + status only — minimal tokens), "+
-					"'standard' (current behavior — pipeline table, artifact sizes, next steps), "+
+					"'summary' (default — stage names + status only — minimal tokens), "+
+					"'standard' (pipeline table, artifact sizes, next steps), "+
 					"'full' (include complete artifact content inline). "+
-					"Defaults to 'standard'. Ignored when 'stage' is set.",
+					"Defaults to 'summary'. Ignored when 'stage' is set.",
 			),
 			mcp.Enum("summary", "standard", "full"),
 		),
@@ -51,7 +51,7 @@ func (t *ContextTool) Definition() mcp.Tool {
 // Handle processes the sdd_get_context tool call.
 func (t *ContextTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	stageFilter := req.GetString("stage", "")
-	detailLevel := req.GetString("detail_level", "standard")
+	detailLevel := req.GetString("detail_level", "summary")
 
 	projectRoot, err := findProjectRoot()
 	if err != nil {

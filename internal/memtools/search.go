@@ -122,5 +122,16 @@ func (t *SearchTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		b.WriteString(memory.SummaryFooter)
 	}
 
+	// Navigation hint when results are capped by limit.
+	total, err := t.store.CountSearchResults(query, memory.SearchOptions{
+		Type:    typ,
+		Project: project,
+		Scope:   scope,
+	})
+	if err == nil {
+		b.WriteString(memory.NavigationHint(len(results), total,
+			"Use mem_get_observation #ID for full content."))
+	}
+
 	return mcp.NewToolResultText(b.String()), nil
 }

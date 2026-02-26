@@ -782,11 +782,9 @@ func TestContextTool_Handle_Overview(t *testing.T) {
 	}
 
 	text := getResultText(result)
+	// Default is now "summary" mode — compact stage list without Pipeline Progress table.
 	if !strings.Contains(text, "test-project") {
 		t.Error("overview should contain project name")
-	}
-	if !strings.Contains(text, "Pipeline Progress") {
-		t.Error("overview should contain pipeline table")
 	}
 	if !strings.Contains(text, "Propose") || !strings.Contains(text, "Specify") {
 		t.Error("overview should list pipeline stages")
@@ -1100,7 +1098,7 @@ func TestContextTool_Handle_DefaultDetailLevel(t *testing.T) {
 	store := config.NewFileStore()
 	tool := NewContextTool(store)
 
-	// No detail_level — should default to standard.
+	// No detail_level — should default to summary (changed in F3).
 	reqWithout := mcp.CallToolRequest{}
 	reqWithout.Params.Arguments = map[string]interface{}{}
 
@@ -1110,8 +1108,12 @@ func TestContextTool_Handle_DefaultDetailLevel(t *testing.T) {
 	}
 
 	textWithout := getResultText(resultWithout)
-	if !strings.Contains(textWithout, "Pipeline Progress") {
-		t.Error("no detail_level should default to standard (with Pipeline Progress)")
+	// Summary mode shows stage names but NOT the full "Pipeline Progress" table.
+	if !strings.Contains(textWithout, "Propose") {
+		t.Error("no detail_level should default to summary (with stage names)")
+	}
+	if strings.Contains(textWithout, "Pipeline Progress") {
+		t.Error("default summary mode should NOT contain Pipeline Progress table")
 	}
 }
 

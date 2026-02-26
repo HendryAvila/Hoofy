@@ -25,7 +25,7 @@ The most relevant article for Hoofy's memory system. Defines context as a finite
 | "Progressive disclosure" — agents discover context layer by layer, keeping only what's necessary | `mem_search` → `mem_timeline` → `mem_get_observation` pattern: search first, drill into timeline, then read full content |
 | "Sub-agent architectures" — specialized sub-agents with clean context windows, return condensed summaries | Knowledge graph with `mem_build_context` traverses relations from any observation, pulling in connected decisions and patterns without loading everything |
 | "Hybrid strategy" — some data retrieved up front, other data explored just-in-time | `mem_context` loads recent history at session start (up front). `mem_search` retrieves specific memories on demand (just-in-time) |
-| "Context is a finite resource" — treat it like an attention budget | 5 read-heavy tools support `detail_level: summary | standard | full` to control response verbosity: `sdd_get_context`, `mem_context`, `mem_search`, `mem_timeline`, `sdd_context_check`. Summary-mode responses include a footer hint for progressive disclosure |
+| "Context is a finite resource" — treat it like an attention budget | 5 read-heavy tools support `detail_level: summary | standard | full` to control response verbosity: `sdd_get_context`, `mem_context`, `mem_search`, `mem_timeline`, `sdd_context_check`. Summary-mode responses include a footer hint for progressive disclosure. `sdd_get_context` defaults to `summary` (minimal pipeline overview) to save tokens on the most frequently called pipeline tool |
 
 ### [Writing Effective Tools for Agents — with Agents](https://www.anthropic.com/engineering/writing-tools-for-agents) (Sep 2025)
 
@@ -36,6 +36,7 @@ Direct guidance on tool design for AI agents. Covers namespacing, consolidation,
 | "Namespacing tools with prefixes helps delineate boundaries" | `mem_*` (18 memory tools), `sdd_*` (9 project pipeline tools), `sdd_change*` (5 change tools) — clear boundaries between systems |
 | "Return only high-signal information, avoid cryptic UUIDs" | Tool responses include human-readable summaries, not raw database rows. `detail_level` parameter lets the AI request only the verbosity needed |
 | "Tools should be self-contained, robust to error, extremely clear" | Each tool has comprehensive parameter descriptions with examples in the tool definition |
+| "Truncate tool responses, but always include total counts" | `mem_search`, `mem_context`, and `mem_timeline` append navigation hints ("📊 Showing X of Y") when results are capped by limit. `NavigationHint()` returns empty string when all results are shown (no noise) |
 
 ### [How We Built Our Multi-Agent Research System](https://www.anthropic.com/engineering/multi-agent-research-system) (Jun 2025)
 

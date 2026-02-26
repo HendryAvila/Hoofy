@@ -50,3 +50,31 @@ func TestSummaryFooterIsNotEmpty(t *testing.T) {
 		t.Error("SummaryFooter should not be empty")
 	}
 }
+
+func TestNavigationHint(t *testing.T) {
+	tests := []struct {
+		name    string
+		showing int
+		total   int
+		hint    string
+		want    string
+	}{
+		{"all results fit", 10, 10, "hint", ""},
+		{"showing more than total", 15, 10, "hint", ""},
+		{"total is zero", 0, 0, "hint", ""},
+		{"total is negative", 5, -1, "hint", ""},
+		{"capped with hint", 10, 47, "Use mem_get_observation #ID for full content.", "\n📊 Showing 10 of 47. Use mem_get_observation #ID for full content."},
+		{"capped without hint", 5, 20, "", "\n📊 Showing 5 of 20."},
+		{"showing zero of many", 0, 100, "Try different filters.", "\n📊 Showing 0 of 100. Try different filters."},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := NavigationHint(tt.showing, tt.total, tt.hint)
+			if got != tt.want {
+				t.Errorf("NavigationHint(%d, %d, %q) =\n  %q\nwant:\n  %q",
+					tt.showing, tt.total, tt.hint, got, tt.want)
+			}
+		})
+	}
+}

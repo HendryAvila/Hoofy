@@ -86,6 +86,11 @@ func (t *TimelineTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 		b.WriteString(memory.SummaryFooter)
 	}
 
+	// Navigation hint when timeline window is smaller than total observations.
+	showing := len(result.Before) + 1 + len(result.After)
+	b.WriteString(memory.NavigationHint(showing, result.TotalInRange,
+		"Increase before/after to see more context."))
+
 	return mcp.NewToolResultText(b.String()), nil
 }
 
