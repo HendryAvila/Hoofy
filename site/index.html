@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hoofy - Learn AI Development the Smart Way</title>
+<meta name="description" content="Interactive documentation for Hoofy — the MCP server that gives AI agents memory, discipline, and spec-driven development.">
+<style>
+/* ============================================
+   CSS CUSTOM PROPERTIES
+   ============================================ */
+:root {
+  --bg-primary: #0d1117;
+  --bg-secondary: #161b22;
+  --bg-tertiary: #21262d;
+  --bg-card: #1c2129;
+  --accent-blue: #58a6ff;
+  --accent-purple: #bc8cff;
+  --accent-green: #3fb950;
+  --accent-gold: #d29922;
+  --accent-red: #f85149;
+  --text-primary: #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted: #484f58;
+  --border: #30363d;
+  --glow-blue: 0 0 20px rgba(88, 166, 255, 0.3);
+  --glow-purple: 0 0 20px rgba(188, 140, 255, 0.3);
+  --glow-green: 0 0 20px rgba(63, 185, 80, 0.4);
+  --glow-gold: 0 0 20px rgba(210, 153, 34, 0.4);
+  --node-size: 72px;
+  --path-width: 4px;
+}
+
+/* ============================================
+   RESET & BASE
+   ============================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   HERO SECTION
+   ============================================ */
+.hero {
+  text-align: center;
+  padding: 60px 20px 40px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse at 50% 0%, rgba(88,166,255,0.08) 0%, transparent 60%),
+              radial-gradient(ellipse at 30% 100%, rgba(188,140,255,0.05) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.hero-icon {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 16px;
+  animation: heroFloat 3s ease-in-out infinite;
+  position: relative;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.hero h1 {
+  font-size: 2.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 12px;
+  position: relative;
+}
+
+.hero .tagline {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+  max-width: 550px;
+  margin: 0 auto 32px;
+  position: relative;
+}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+.progress-container {
+  max-width: 400px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.progress-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.progress-count {
+  font-weight: 700;
+  color: var(--accent-blue);
+  font-size: 0.95rem;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--bg-tertiary);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+  border-radius: 10px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  width: 0%;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ============================================
+   SKILL TREE
+   ============================================ */
+.skill-tree {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+  position: relative;
+}
+
+/* Track labels */
+.track-label {
+  text-align: center;
+  margin: 48px 0 32px;
+  position: relative;
+}
+
+.track-label:first-child {
+  margin-top: 16px;
+}
+
+.track-label span {
+  display: inline-block;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  padding: 8px 24px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+/* Node row */
+.node-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  margin: 12px 0;
+  padding: 8px 0;
+}
+
+.node-row.left { justify-content: flex-start; padding-left: 20%; }
+.node-row.right { justify-content: flex-end; padding-right: 20%; }
+.node-row.center { justify-content: center; }
+
+/* Connector lines */
+.connector {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  width: var(--path-width);
+  height: 20px;
+  background: var(--border);
+  transform: translateX(-50%);
+  z-index: 0;
+}
+
+.node-row.left .connector,
+.node-row.right .connector {
+  width: 80px;
+  height: var(--path-width);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.node-row.left .connector {
+  left: auto;
+  right: calc(80% - 36px);
+  width: calc(30% - 36px);
+  top: -20px;
+  height: 40px;
+  background: none;
+  border-left: var(--path-width) solid var(--border);
+  border-bottom: var(--path-width) solid var(--border);
+  border-bottom-left-radius: 24px;
+}
+
+.node-row.right .connector {
+  left: calc(20% + 36px);
+  width: calc(30% - 36px);
+  top: -20px;
+  height: 40px;
+  background: none;
+  border-right: var(--path-width) solid var(--border);
+  border-bottom: var(--path-width) solid var(--border);
+  border-bottom-right-radius: 24px;
+}
+
+.node-row.center .connector {
+  display: block;
+}
+
+.node-row:first-child .connector {
+  display: none;
+}
+
+/* connector active state */
+.node-row.connector-active .connector {
+  border-color: var(--accent-blue);
+}
+
+.node-row.connector-active.connector-completed .connector {
+  border-color: var(--accent-green);
+}
+
+.node-row.center.connector-active .connector {
+  background: var(--accent-blue);
+}
+
+.node-row.center.connector-completed .connector {
+  background: var(--accent-green);
+}
+
+/* ============================================
+   NODES
+   ============================================ */
+.node {
+  width: var(--node-size);
+  height: var(--node-size);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  cursor: default;
+  position: relative;
+  z-index: 2;
+  transition: all 0.3s ease;
+  border: 3px solid var(--border);
+  background: var(--bg-secondary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Locked */
+.node.locked {
+  opacity: 0.4;
+  filter: grayscale(80%);
+  cursor: not-allowed;
+}
+
+.node.locked .node-icon {
+  filter: grayscale(100%) brightness(0.5);
+}
+
+.node.locked::after {
+  content: '🔒';
+  position: absolute;
+  font-size: 0.7rem;
+  bottom: -2px;
+  right: -2px;
+}
+
+/* Unlocked / Current */
+.node.current {
+  border-color: var(--accent-blue);
+  box-shadow: var(--glow-blue);
+  cursor: pointer;
+  animation: nodePulse 2s ease-in-out infinite;
+}
+
+.node.current:hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 30px rgba(88, 166, 255, 0.5);
+}
+
+@keyframes nodePulse {
+  0%, 100% { transform: scale(1); box-shadow: var(--glow-blue); }
+  50% { transform: scale(1.06); box-shadow: 0 0 30px rgba(88, 166, 255, 0.45); }
+}
+
+/* Completed */
+.node.completed {
+  border-color: var(--accent-green);
+  box-shadow: var(--glow-green);
+  cursor: pointer;
+  animation: none;
+  background: linear-gradient(135deg, rgba(63,185,80,0.15), var(--bg-secondary));
+}
+
+.node.completed:hover {
+  transform: scale(1.08);
+}
+
+.node.completed::after {
+  content: '✓';
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
+  background: var(--accent-green);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--bg-primary);
+}
+
+/* Unlock animation */
+.node.unlock-anim {
+  animation: nodeUnlock 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes nodeUnlock {
+  0% { transform: scale(0.5); opacity: 0.3; }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Node title tooltip */
+.node-title {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  background: var(--bg-secondary);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.node:not(.locked):hover .node-title {
+  opacity: 1;
+}
+
+.node-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+
+/* ============================================
+   MODAL
+   ============================================ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.modal-backdrop.active {
+  display: flex;
+  opacity: 1;
+}
+
+.modal-backdrop.closing {
+  opacity: 0;
+}
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 520px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+  transform: translateY(30px) scale(0.95);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s;
+  opacity: 0;
+}
+
+.modal-backdrop.active .modal {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+}
+
+.modal-backdrop.closing .modal {
+  transform: translateY(20px) scale(0.95);
+  opacity: 0;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+  z-index: 2;
+}
+
+.modal-close:hover {
+  background: var(--accent-red);
+  color: white;
+  border-color: var(--accent-red);
+}
+
+.modal-header {
+  padding: 32px 32px 0;
+  text-align: center;
+}
+
+.modal-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.modal-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.modal-track {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+.modal-body {
+  padding: 20px 32px;
+}
+
+.modal-summary {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+/* Learn More expandable */
+.learn-more-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--accent-blue);
+  padding: 10px 20px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  width: 100%;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.learn-more-toggle:hover {
+  background: rgba(88, 166, 255, 0.08);
+  border-color: var(--accent-blue);
+}
+
+.learn-more-toggle .arrow {
+  transition: transform 0.3s;
+  font-size: 0.7rem;
+}
+
+.learn-more-toggle.expanded .arrow {
+  transform: rotate(180deg);
+}
+
+.learn-more-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), padding 0.3s;
+  padding: 0 0;
+}
+
+.learn-more-content.expanded {
+  max-height: 1200px;
+  padding: 20px 0 0;
+}
+
+.learn-more-section {
+  margin-bottom: 20px;
+}
+
+.learn-more-section h4 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent-purple);
+  margin-bottom: 8px;
+  font-weight: 700;
+}
+
+.learn-more-section p,
+.learn-more-section ul {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.learn-more-section ul {
+  padding-left: 20px;
+}
+
+.learn-more-section li {
+  margin-bottom: 6px;
+}
+
+.learn-more-section code {
+  background: var(--bg-tertiary);
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--accent-blue);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+
+.learn-more-section pre {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  overflow-x: auto;
+  margin: 10px 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.learn-more-section pre code {
+  background: none;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+/* Modal footer */
+.modal-footer {
+  padding: 16px 32px 28px;
+  text-align: center;
+}
+
+.btn-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+  color: white;
+  border: none;
+  padding: 14px 40px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  letter-spacing: 0.3px;
+}
+
+.btn-complete:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(88, 166, 255, 0.3);
+}
+
+.btn-complete:active {
+  transform: translateY(0);
+}
+
+.btn-complete.completed-btn {
+  background: var(--bg-tertiary);
+  color: var(--accent-green);
+  cursor: default;
+  border: 1px solid var(--accent-green);
+}
+
+.btn-complete.completed-btn:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* ============================================
+   MASCOT
+   ============================================ */
+.mascot {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 90;
+  transform: translateX(150%);
+  transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  max-width: 320px;
+}
+
+.mascot.visible {
+  transform: translateX(0);
+}
+
+.mascot-emoji {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.mascot-msg {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.mascot-msg strong {
+  color: var(--accent-gold);
+}
+
+/* ============================================
+   CONFETTI CANVAS
+   ============================================ */
+#confetti-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+}
+
+/* ============================================
+   COMPLETION BANNER
+   ============================================ */
+.completion-banner {
+  text-align: center;
+  padding: 40px 20px;
+  display: none;
+}
+
+.completion-banner.visible {
+  display: block;
+  animation: slideUp 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.completion-banner h2 {
+  font-size: 2rem;
+  margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--accent-gold), var(--accent-green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.completion-banner p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   SPARKLE EFFECT
+   ============================================ */
+.sparkle-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sparkle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  animation: sparkleFade 0.8s ease-out forwards;
+}
+
+@keyframes sparkleFade {
+  0% { transform: scale(0) translate(0, 0); opacity: 1; }
+  50% { transform: scale(1.5) translate(var(--tx), var(--ty)); opacity: 0.8; }
+  100% { transform: scale(0) translate(calc(var(--tx) * 2), calc(var(--ty) * 2)); opacity: 0; }
+}
+
+/* ============================================
+   FOOTER
+   ============================================ */
+.site-footer {
+  text-align: center;
+  padding: 40px 20px;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+
+.site-footer p {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.site-footer a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
+.btn-reset {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  margin-top: 12px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+
+.btn-reset:hover {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2rem; }
+  .hero .tagline { font-size: 1rem; }
+  .hero { padding: 40px 16px 24px; }
+
+  .skill-tree { padding: 24px 16px 60px; }
+
+  .node-row.left,
+  .node-row.right { 
+    justify-content: center; 
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .node-row.left .connector,
+  .node-row.right .connector {
+    left: 50%;
+    right: auto;
+    width: var(--path-width);
+    height: 20px;
+    top: -16px;
+    border: none;
+    background: var(--border);
+    border-radius: 0;
+    transform: translateX(-50%);
+  }
+
+  .node-row.connector-active.left .connector,
+  .node-row.connector-active.right .connector {
+    background: var(--accent-blue);
+  }
+
+  .node-row.connector-completed.left .connector,
+  .node-row.connector-completed.right .connector {
+    background: var(--accent-green);
+  }
+
+  :root { --node-size: 64px; }
+
+  .modal { max-width: 95%; }
+  .modal-header { padding: 24px 20px 0; }
+  .modal-body { padding: 16px 20px; }
+  .modal-footer { padding: 12px 20px 24px; }
+
+  .mascot { 
+    bottom: 16px; 
+    right: 16px; 
+    left: 16px;
+    max-width: none;
+  }
+
+  .node-title { display: none; }
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+.modal::-webkit-scrollbar { width: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     HERO
+     ============================================ -->
+<header class="hero">
+  <span class="hero-icon">🐴</span>
+  <h1>Hoofy</h1>
+  <p class="tagline">Memory, discipline, and spec-driven development for AI agents. Learn what makes Hoofy tick — one concept at a time.</p>
+  <div class="progress-container">
+    <div class="progress-label">
+      <span>Your progress</span>
+      <span class="progress-count" id="progress-count">0 / 14</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================
+     SKILL TREE (generated by JS)
+     ============================================ -->
+<main class="skill-tree" id="skill-tree"></main>
+
+<!-- ============================================
+     COMPLETION BANNER
+     ============================================ -->
+<div class="completion-banner" id="completion-banner">
+  <h2>🏆 You mastered Hoofy!</h2>
+  <p>You now know every feature. Go build something amazing — with specs first, obviously. 🐴</p>
+</div>
+
+<!-- ============================================
+     FOOTER
+     ============================================ -->
+<footer class="site-footer">
+  <p>Built with 🐴 by <a href="https://github.com/HendryAvila/Hoofy" target="_blank" rel="noopener">Hoofy</a> — every feature grounded in research.</p>
+  <button type="button" class="btn-reset" id="btn-reset">Reset Progress</button>
+</footer>
+
+<!-- ============================================
+     MODAL
+     ============================================ -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" id="modal" role="dialog" aria-modal="true">
+    <button type="button" class="modal-close" id="modal-close" aria-label="Close">✕</button>
+    <div class="modal-header">
+      <span class="modal-icon" id="modal-icon"></span>
+      <h2 class="modal-title" id="modal-title"></h2>
+      <div class="modal-track" id="modal-track"></div>
+    </div>
+    <div class="modal-body">
+      <p class="modal-summary" id="modal-summary"></p>
+      <button type="button" class="learn-more-toggle" id="learn-more-toggle">
+        <span class="arrow">▼</span> Learn More
+      </button>
+      <div class="learn-more-content" id="learn-more-content"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-complete" id="btn-complete">Got it! ✓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================
+     MASCOT
+     ============================================ -->
+<div class="mascot" id="mascot">
+  <span class="mascot-emoji">🐴</span>
+  <span class="mascot-msg" id="mascot-msg"></span>
+</div>
+
+<!-- ============================================
+     CONFETTI CANVAS
+     ============================================ -->
+<canvas id="confetti-canvas"></canvas>
+
+<script>
+/* ============================================
+   NODE DATA — 14 concepts
+   ============================================ */
+const NODES = [
+  /* ─── Track 1: Foundation ─── */
+  {
+    id: 1,
+    track: 'foundation',
+    trackLabel: '🧠 Foundation',
+    trackStart: true,
+    icon: '🐴',
+    title: 'What is Hoofy?',
+    summary: 'Hoofy is an MCP server that gives AI agents two things they desperately lack: persistent memory and structured discipline. It prevents hallucinations by forcing specs before code and remembers context across sessions.',
+    details: {
+      what: `<p>Hoofy is a <strong>single static binary</strong> (written in Go) that speaks the MCP (Model Context Protocol). It plugs into AI assistants like Claude, giving them 34 tools across three systems: Memory, Project Pipeline, and Change Pipeline.</p>
+<p>Think of it as the difference between an AI with amnesia that starts fresh every conversation, and an AI that remembers your architecture decisions, knows your codebase conventions, and refuses to write code without understanding the requirements first.</p>`,
+      how: `<pre><code># Install and run — zero dependencies
+hoofy serve
+
+# The AI uses 34 MCP tools automatically:
+mem_save, mem_search, mem_context,
+sdd_change, sdd_init_project, sdd_clarify...</code></pre>`,
+      why: '<p>Research from <strong>METR 2025</strong> found that experienced developers were 19% <em>slower</em> with unstructured AI despite feeling 20% faster. Hoofy provides the structure that makes AI actually help.</p>'
+    }
+  },
+  {
+    id: 2,
+    track: 'foundation',
+    icon: '💾',
+    title: 'Persistent Memory',
+    summary: 'SQLite database with FTS5 full-text search. The AI saves observations (decisions, bugs, patterns, discoveries) and retrieves them across sessions. No more repeating yourself.',
+    details: {
+      what: `<p>Every important insight gets saved as an <strong>observation</strong> with a title, type, content, and project tag. Observations are stored in SQLite with FTS5 full-text search indexing, so the AI can find past decisions instantly.</p>
+<p>Sessions track work periods — when you start, what you accomplished, and a structured summary for future sessions to read.</p>`,
+      how: `<pre><code># The AI saves observations proactively:
+mem_save(title="JWT auth middleware", 
+         type="decision",
+         content="**What**: Switched to JWT...")
+
+# And retrieves them later:
+mem_search(query="authentication")
+mem_context(limit=20)  # recent observations</code></pre>`,
+      why: '<p>Anthropic\'s <strong>"Effective Context Engineering"</strong> article defines this as "structured note-taking / agentic memory" — the agent writes notes persisted outside the context window and pulls them back later.</p>'
+    }
+  },
+  {
+    id: 3,
+    track: 'foundation',
+    icon: '🕸️',
+    title: 'Knowledge Graph',
+    summary: 'Observations aren\'t flat notes — they\'re connected with typed relations (caused_by, implements, depends_on, supersedes). Navigate your decision history like a web, not a list.',
+    details: {
+      what: `<p>Relations are typed, directional edges between observations. When you fix a bug, you can relate it to the decision that caused it. When you implement a feature, link the tasks to their requirements. When a new decision replaces an old one, mark it as <code>supersedes</code>.</p>
+<p><code>mem_build_context</code> traverses the graph from any starting point, showing connected observations up to a configurable depth. It transforms flat memories into a navigable web.</p>`,
+      how: `<pre><code># Create a relation:
+mem_relate(from_id=42, to_id=37, 
+           relation_type="caused_by",
+           note="This bug was caused by the 
+                 auth decision in observation 37")
+
+# Traverse the graph:
+mem_build_context(observation_id=42, depth=3)</code></pre>`,
+      why: '<p>Isolated observations lose context over time. Relations preserve the <strong>why</strong> — not just what was decided, but what led to it and what it affected. This is how experienced developers think: in connected webs, not isolated facts.</p>'
+    }
+  },
+
+  /* ─── Track 2: SDD Pipeline ─── */
+  {
+    id: 4,
+    track: 'sdd-pipeline',
+    trackLabel: '📋 Spec-Driven Development',
+    trackStart: true,
+    icon: '📋',
+    title: 'The SDD Pipeline',
+    summary: 'Eight stages from vague idea to validated architecture: propose → specify → business rules → clarify → design → tasks → validate. No skipping allowed. The AI generates content, the pipeline enforces order.',
+    details: {
+      what: `<p>The SDD (Spec-Driven Development) pipeline is an <strong>8-stage sequential workflow</strong> for greenfield projects. Each stage produces a markdown artifact, and you can't advance to the next stage until the current one is complete.</p>
+<p>The pipeline stages are: <strong>init → propose → specify → business-rules → clarify → design → tasks → validate</strong>. Tools are "dumb storage" — the AI generates the content, the tools save it and advance the state machine.</p>`,
+      how: `<pre><code># 1. Initialize the project
+sdd_init_project(name="MyApp", 
+                 description="A task manager")
+
+# 2. Create proposal (problem, users, solution)
+sdd_create_proposal(problem_statement="...",
+                    target_users="...", ...)
+
+# 3. Generate requirements (MoSCoW)
+sdd_generate_requirements(must_have="...",
+                          should_have="...", ...)
+
+# ... continues through all stages</code></pre>`,
+      why: '<p><strong>IEEE 720574</strong> shows that fixing a requirement error in production costs 10-100x more than catching it during the requirements phase. The pipeline front-loads thinking where it\'s cheapest.</p>'
+    }
+  },
+  {
+    id: 5,
+    track: 'sdd-pipeline',
+    icon: '🚪',
+    title: 'The Clarity Gate',
+    summary: 'The core innovation. Analyzes requirements across 8 dimensions of ambiguity and BLOCKS advancement until clarity exceeds the threshold. No more "just figure it out as you go."',
+    details: {
+      what: `<p>The Clarity Gate sits between requirements and design. It scores your specifications across <strong>8 dimensions</strong>: target users, core functionality, data model, integrations, edge cases, security, scale/performance, and scope boundaries.</p>
+<p>Each dimension gets a score (0-100). The weighted average must exceed the threshold — <strong>70 for guided mode, 50 for expert mode</strong> — or the pipeline won't advance. The AI generates specific questions to resolve ambiguities.</p>`,
+      how: `<pre><code># First call — analyze requirements:
+sdd_clarify()
+# Returns: dimensions, scoring framework
+
+# AI generates questions, user answers
+# Second call — submit scores:
+sdd_clarify(
+  answers="Q1: ... A1: ...",
+  dimension_scores="target_users:85,
+    core_functionality:90,data_model:70,
+    integrations:60,edge_cases:55,
+    security:75,scale_performance:65,
+    scope_boundaries:80"
+)</code></pre>`,
+      why: '<p>This is Hoofy\'s <strong>evaluator-optimizer pattern</strong> from Anthropic\'s "Building Effective Agents". It forces iterative refinement of requirements until they\'re clear enough to build from. Most AI-generated code fails because the requirements were ambiguous, not because the AI can\'t code.</p>'
+    }
+  },
+  {
+    id: 6,
+    track: 'sdd-pipeline',
+    icon: '📜',
+    title: 'Business Rules',
+    summary: 'Declarative rules extracted from requirements using BRG taxonomy (Definitions, Facts, Constraints, Derivations) and DDD Ubiquitous Language. Rules are first-class citizens, not buried in code.',
+    details: {
+      what: `<p>Business rules are structural truths about your domain. They sit between requirements and the Clarity Gate. The AI extracts four types of rules:</p>
+<ul>
+<li><strong>Definitions</strong> — Domain terms with precise meaning (Ubiquitous Language)</li>
+<li><strong>Facts</strong> — Relationships that are always true ("A Customer has exactly one Account")</li>
+<li><strong>Constraints</strong> — Behavioral boundaries ("When order > $500, then approval required")</li>
+<li><strong>Derivations</strong> — Computed knowledge ("Customer is premium when spend > $10K")</li>
+</ul>`,
+      how: `<pre><code>sdd_create_business_rules(
+  definitions="**Customer**: A person who has 
+    completed at least one purchase...",
+  facts="A Customer has exactly one Account.
+    An Account has zero or more Orders...",
+  constraints="When Order total > $500, Then 
+    manager approval is required...",
+  derivations="Customer is 'premium' when total 
+    spend exceeds $10,000 in 12 months..."
+)</code></pre>`,
+      why: '<p>The <strong>Business Rules Group Manifesto</strong> (Ronald Ross) establishes that rules should be declarative, separate from processes, and treated as first-class citizens. When rules live in code, they get lost. When they\'re explicit, they\'re verifiable.</p>'
+    }
+  },
+
+  /* ─── Track 3: Adaptive Changes ─── */
+  {
+    id: 7,
+    track: 'adaptive-changes',
+    trackLabel: '🔄 Adaptive Changes',
+    trackStart: true,
+    icon: '🔄',
+    title: 'Change Pipeline',
+    summary: '90% of real work is on existing code. Four change types (feature, fix, refactor, enhancement) times three sizes (small, medium, large) equals 12 adaptive workflows. Only the stages you need.',
+    details: {
+      what: `<p>The full 8-stage pipeline is for greenfield projects. For ongoing development, the <strong>adaptive change pipeline</strong> selects only the stages needed based on what you're doing and how complex it is.</p>
+<p>A small bug fix gets 4 stages. A large new feature gets 7. Each change creates a directory with markdown artifacts, and only <strong>one active change</strong> is allowed at a time — forcing you to finish what you started.</p>`,
+      how: `<pre><code># Small fix: describe → context-check → tasks → verify
+sdd_change(type="fix", size="small",
+  description="Fix FTS5 empty query crash")
+
+# Large feature: propose → context-check → spec → 
+#   clarify → design → tasks → verify  
+sdd_change(type="feature", size="large",
+  description="Add real-time collaboration")
+
+# Work through stages:
+sdd_change_advance(content="...")  # saves & advances
+sdd_change_status()  # check progress</code></pre>`,
+      why: '<p>Anthropic\'s "Building Effective Agents" recommends doing <strong>"the simplest thing that works"</strong> — avoid over-engineering agent systems. A small fix doesn\'t need a full design document. A large feature does. The pipeline adapts to the work, not the other way around.</p>'
+    }
+  },
+  {
+    id: 8,
+    track: 'adaptive-changes',
+    icon: '🔍',
+    title: 'Context Check',
+    summary: 'Mandatory first stage in every change flow. Scans existing specs, completed changes, memory, and convention files for conflicts. Even a small change can break a business rule — this catches it.',
+    details: {
+      what: `<p>Context Check is a <strong>mandatory gate</strong> that runs before any work begins. It scans your project for:</p>
+<ul>
+<li>Existing SDD artifacts (requirements, business rules, design)</li>
+<li>Previously completed changes (keyword-matched)</li>
+<li>Memory observations (decisions, patterns)</li>
+<li>Convention files (CLAUDE.md, AGENTS.md, CONTRIBUTING.md)</li>
+</ul>
+<p>The AI then analyzes the scan results using <strong>Requirements Smells heuristics</strong> (IEEE 29148) — looking for subjective language, ambiguous adverbs, non-verifiable terms, and conflicts with existing rules.</p>`,
+      how: `<pre><code># The tool scans — the AI analyzes:
+sdd_context_check(
+  change_description="Add OAuth login",
+  project_name="MyApp"
+)
+# Returns: structured report of findings
+# AI checks for conflicts, ambiguity, impact
+
+# Impact classification (SemVer model):
+# - Breaking: existing tests would fail
+# - Non-breaking: adds new behavior
+# - Patch: internal change only</code></pre>`,
+      why: '<p><strong>Femmer et al. 2017</strong> and <strong>IEEE 29148</strong> provide the heuristics for detecting requirements smells — subjective language ("user-friendly"), totality terms ("always", "never"), and comparatives without baselines ("faster than"). Catching these early prevents expensive misunderstandings.</p>'
+    }
+  },
+  {
+    id: 9,
+    track: 'adaptive-changes',
+    icon: '🏛️',
+    title: 'Architecture Decision Records',
+    summary: 'Capture decisions with context, rationale, and rejected alternatives. Future you (or future AI sessions) will thank present you when they need to understand WHY something was built a certain way.',
+    details: {
+      what: `<p>ADRs (Architecture Decision Records) follow the <strong>Michael Nygard format</strong>: title, context, decision, rationale, and alternatives rejected. They can be captured at any time — with or without an active change.</p>
+<p>With an active change, ADRs are saved as files in the change directory AND to memory. Without an active change, they go to memory only. Either way, they're searchable and permanent.</p>`,
+      how: `<pre><code>sdd_adr(
+  title="Use PostgreSQL over MongoDB",
+  context="Need to store relational data 
+    with ACID transactions",
+  decision="PostgreSQL 16",
+  rationale="Data is inherently relational. 
+    ACID compliance required for financial 
+    records.",
+  alternatives_rejected="MongoDB: no native 
+    joins, eventual consistency. SQLite: 
+    single-writer limitation."
+)</code></pre>`,
+      why: '<p>Code tells you WHAT was built. ADRs tell you <strong>WHY</strong>. Without them, every future developer (and AI agent) has to reverse-engineer the reasoning — or worse, change something without understanding the original constraints.</p>'
+    }
+  },
+
+  /* ─── Track 4: Context Engineering ─── */
+  {
+    id: 10,
+    track: 'context-engineering',
+    trackLabel: '⚡ Context Engineering',
+    trackStart: true,
+    icon: '🎚️',
+    title: 'Detail Level',
+    summary: 'Five read-heavy tools support a detail_level parameter: summary (minimal tokens), standard (truncated snippets), or full (everything). Fetch the minimum you need first, then drill deeper.',
+    details: {
+      what: `<p>Not every tool call needs the full response. The <code>detail_level</code> parameter lets the AI choose how much data to receive:</p>
+<ul>
+<li><strong>summary</strong> — IDs, titles, metadata only. For orientation and triage.</li>
+<li><strong>standard</strong> — Truncated content snippets. Good balance for most operations.</li>
+<li><strong>full</strong> — Complete untruncated content. Only when you need deep analysis.</li>
+</ul>
+<p><code>sdd_get_context</code> defaults to <strong>summary</strong> (most frequently called tool). Others default to <strong>standard</strong>.</p>`,
+      how: `<pre><code># Quick scan — what exists?
+mem_search(query="auth", detail_level="summary")
+# Returns: titles and IDs only (~50 tokens)
+
+# Found something interesting — get details:
+mem_get_observation(id=42)
+# Returns: full content for that one observation
+
+# Progressive disclosure pattern:
+# summary → standard → full → get_observation</code></pre>`,
+      why: '<p>Anthropic: <strong>"Context is a finite resource."</strong> Every token of context the AI reads costs attention. Sending 5000 tokens when 200 would suffice means the AI has less capacity for the actual task. Detail level is attention budgeting.</p>'
+    }
+  },
+  {
+    id: 11,
+    track: 'context-engineering',
+    icon: '📏',
+    title: 'Budget Awareness',
+    summary: 'Five tools accept a max_tokens parameter that hard-caps response size. Token estimation uses a fast len/4 heuristic. Every response shows its token footprint. Detail level controls WHAT, max_tokens controls HOW MUCH.',
+    details: {
+      what: `<p><code>max_tokens</code> is a hard cap on response size. The AI sets a budget, and the tool ensures the response stays within it. Token estimation uses <code>len(text)/4</code> — a fast O(1) heuristic with no tokenizer dependency.</p>
+<p>Every response from these tools includes a <code>📏 ~N tokens</code> footer showing estimated size. Budget-capped responses prepend a <code>⚡ Budget-capped</code> notice so the AI knows data was truncated.</p>`,
+      how: `<pre><code># "Give me context, but stay under 500 tokens"
+mem_context(limit=20, max_tokens=500)
+
+# Complementary with detail_level:
+mem_search(query="auth", 
+           detail_level="standard",
+           max_tokens=1000)
+
+# Every response shows its footprint:
+# ... content ...
+# 📏 ~347 tokens</code></pre>`,
+      why: '<p>Anthropic\'s multi-agent research found that <strong>"token usage explains 80% of performance variance"</strong> — more tokens does NOT equal better results. Explicit budget caps prevent bloated responses that degrade AI performance.</p>'
+    }
+  },
+  {
+    id: 12,
+    track: 'context-engineering',
+    icon: '🧹',
+    title: 'Navigation & Compaction',
+    summary: 'Navigation hints tell the AI "📊 Showing 10 of 47" so it knows when data is incomplete. mem_compact cleans up stale observations. mem_progress tracks structured progress that survives context compaction.',
+    details: {
+      what: `<p>Three features working together to keep context fresh and navigable:</p>
+<ul>
+<li><strong>Navigation hints</strong> — "📊 Showing X of Y" footer when results are capped by limit. The AI knows whether it's seeing everything or needs to adjust.</li>
+<li><strong>mem_compact</strong> — Identifies stale observations (older than N days) and batch soft-deletes them. Optionally creates a "compaction_summary" to preserve key knowledge.</li>
+<li><strong>mem_progress</strong> — Structured JSON progress docs that survive context compaction. One active progress per project, auto-upserted via topic key.</li>
+</ul>`,
+      how: `<pre><code># Navigation hints appear automatically:
+mem_search(query="auth", limit=5)
+# ... results ...
+# 📊 Showing 5 of 23 — adjust limit for more
+
+# Compact stale observations:
+mem_compact(older_than_days=30)  # list candidates
+mem_compact(compact_ids="12,15,18,22",
+  summary="Auth decisions consolidated...")
+
+# Track progress across context windows:
+mem_progress(project="MyApp", 
+  content='{"phase":"implementing","done":3}')</code></pre>`,
+      why: '<p>Anthropic\'s "Effective Harnesses for Long-Running Agents" recommends that each session should <strong>"read progress, then start new work."</strong> <code>mem_progress</code> ensures handoff between sessions is smooth. Compaction prevents memory from growing unbounded.</p>'
+    }
+  },
+  {
+    id: 13,
+    track: 'context-engineering',
+    icon: '🏷️',
+    title: 'Sub-Agent Scoping',
+    summary: 'When multiple AI sub-agents work in parallel, the namespace parameter isolates each agent\'s memory. Each sub-agent sees only its own notes. The orchestrator omits namespace to see everything.',
+    details: {
+      what: `<p>In multi-agent architectures (orchestrator + researcher + coder + reviewer), each sub-agent needs its own memory space. The <code>namespace</code> parameter tags observations with an isolation boundary.</p>
+<p>Seven tools support namespace — 4 write tools (<code>mem_save</code>, <code>mem_save_prompt</code>, <code>mem_session_summary</code>, <code>mem_progress</code>) and 3 read tools (<code>mem_search</code>, <code>mem_context</code>, <code>mem_compact</code>). The orchestrator omits namespace to see all observations across all sub-agents.</p>`,
+      how: `<pre><code># Sub-agent saves with namespace:
+mem_save(title="Auth API findings",
+  namespace="subagent/researcher-123",
+  content="...")
+
+# Sub-agent reads only its own notes:
+mem_search(query="auth", 
+  namespace="subagent/researcher-123")
+
+# Orchestrator sees EVERYTHING:
+mem_search(query="auth")  # no namespace
+
+# Convention:
+# "subagent/task-123" — by task
+# "agent/researcher"  — by role</code></pre>`,
+      why: '<p>Anthropic\'s multi-agent research emphasizes that <strong>"each sub-agent works independently with its own context"</strong> — parallel agents need memory isolation to prevent cross-contamination. Namespace provides opt-in isolation without separate databases.</p>'
+    }
+  },
+
+  /* ─── Track 5: Boss Level ─── */
+  {
+    id: 14,
+    track: 'boss-level',
+    trackLabel: '🏆 Boss Level',
+    trackStart: true,
+    icon: '🏆',
+    title: 'Research Foundations',
+    summary: 'Every Hoofy feature maps to published research — 6 Anthropic engineering articles, IEEE standards, IREB, METR 2025, DORA 2025, Business Rules Group. This isn\'t vibes-driven development. It\'s evidence-based engineering.',
+    details: {
+      what: `<p>Hoofy doesn't add features because they "seem cool." Every capability maps to a specific recommendation from published research:</p>
+<ul>
+<li><strong>6 Anthropic articles</strong> — Building Effective Agents, Effective Context Engineering, Writing Tools for Agents, Multi-Agent Research, Effective Harnesses, Claude Code Best Practices</li>
+<li><strong>IEEE 29148 & IEEE 720574</strong> — Requirements engineering standards</li>
+<li><strong>METR 2025</strong> — Experienced devs 19% slower with unstructured AI</li>
+<li><strong>DORA 2025</strong> — 7.2% delivery instability per 25% AI adoption without foundations</li>
+<li><strong>Business Rules Group</strong> — Declarative rules as first-class citizens</li>
+<li><strong>EARS</strong> — Easy Approach to Requirements Syntax</li>
+</ul>`,
+      how: `<pre><code># The full research mapping lives in:
+# docs/research-foundations.md
+
+# Example mapping:
+# Anthropic: "Context is a finite resource"
+#   → detail_level parameter
+#   → max_tokens budget capping
+#   → mem_compact for stale cleanup
+
+# IEEE 720574: "10-100x cost multiplier 
+#   for requirement errors in production"
+#   → Clarity Gate catches ambiguities early</code></pre>`,
+      why: '<p>Because <strong>"it works on my machine"</strong> is not a research methodology. Every feature should justify its existence with evidence. If you can\'t point to WHY a feature exists, it probably shouldn\'t. Hoofy practices what it preaches — structured, justified, traceable.</p>'
+    }
+  }
+];
+
+/* ============================================
+   STATE
+   ============================================ */
+const STORAGE_KEY = 'hoofy-docs-progress';
+let completedIds = [];
+let currentModalId = null;
+let mascotTimer = null;
+
+/* ============================================
+   INIT
+   ============================================ */
+function init() {
+  loadProgress();
+  renderTree();
+  renderProgress();
+  bindEvents();
+  checkMilestone(true);
+}
+
+function loadProgress() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    completedIds = saved ? JSON.parse(saved) : [];
+    if (!Array.isArray(completedIds)) completedIds = [];
+  } catch { completedIds = []; }
+}
+
+function saveProgress() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(completedIds)); } catch {}
+}
+
+/* ============================================
+   NODE STATE
+   ============================================ */
+function getNodeState(id) {
+  if (completedIds.includes(id)) return 'completed';
+  // Node is unlocked if all previous nodes are completed (or it's the first)
+  if (id === 1) return completedIds.includes(1) ? 'completed' : 'current';
+  const prevCompleted = completedIds.includes(id - 1);
+  if (prevCompleted) return 'current';
+  return 'locked';
+}
+
+/* ============================================
+   RENDER TREE
+   ============================================ */
+function renderTree() {
+  const tree = document.getElementById('skill-tree');
+  tree.innerHTML = '';
+  const positions = ['center','left','right','center','left','right','center','left','right','center','left','right','center','center'];
+
+  NODES.forEach((node, i) => {
+    // Track label
+    if (node.trackStart) {
+      const label = document.createElement('div');
+      label.className = 'track-label';
+      label.innerHTML = `<span>${node.trackLabel}</span>`;
+      tree.appendChild(label);
+    }
+
+    const state = getNodeState(node.id);
+    const pos = positions[i] || 'center';
+
+    const row = document.createElement('div');
+    row.className = `node-row ${pos}`;
+    row.id = `node-row-${node.id}`;
+
+    // Connector states
+    if (i > 0) {
+      const prevState = getNodeState(NODES[i-1].id);
+      if (prevState === 'completed' || state === 'completed' || state === 'current') {
+        row.classList.add('connector-active');
+      }
+      if (prevState === 'completed' && state === 'completed') {
+        row.classList.add('connector-completed');
+      }
+    }
+
+    const connector = i > 0 ? '<div class="connector"></div>' : '';
+
+    row.innerHTML = `
+      ${connector}
+      <div class="node ${state}" data-id="${node.id}" role="button" tabindex="${state !== 'locked' ? 0 : -1}" aria-label="${node.title}${state === 'locked' ? ' (locked)' : ''}">
+        <span class="node-icon">${node.icon}</span>
+        <span class="node-title">${node.title}</span>
+      </div>
+    `;
+
+    tree.appendChild(row);
+  });
+}
+
+/* ============================================
+   RENDER PROGRESS
+   ============================================ */
+function renderProgress() {
+  const count = completedIds.length;
+  const total = NODES.length;
+  const pct = (count / total) * 100;
+
+  document.getElementById('progress-count').textContent = `${count} / ${total}`;
+  document.getElementById('progress-fill').style.width = `${pct}%`;
+
+  // Completion banner
+  const banner = document.getElementById('completion-banner');
+  if (count >= total) {
+    banner.classList.add('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+}
+
+/* ============================================
+   MODAL
+   ============================================ */
+function openModal(id) {
+  const node = NODES.find(n => n.id === id);
+  if (!node) return;
+  const state = getNodeState(id);
+  if (state === 'locked') return;
+
+  currentModalId = id;
+
+  document.getElementById('modal-icon').textContent = node.icon;
+  document.getElementById('modal-title').textContent = node.title;
+  document.getElementById('modal-track').textContent = node.trackLabel || '';
+
+  document.getElementById('modal-summary').textContent = node.summary;
+
+  // Learn more content
+  const lmContent = document.getElementById('learn-more-content');
+  lmContent.innerHTML = `
+    <div class="learn-more-section">
+      <h4>What it does</h4>
+      ${node.details.what}
+    </div>
+    <div class="learn-more-section">
+      <h4>How it works</h4>
+      ${node.details.how}
+    </div>
+    <div class="learn-more-section">
+      <h4>Why it matters</h4>
+      ${node.details.why}
+    </div>
+  `;
+  lmContent.classList.remove('expanded');
+  document.getElementById('learn-more-toggle').classList.remove('expanded');
+
+  // Button state
+  const btn = document.getElementById('btn-complete');
+  if (state === 'completed') {
+    btn.textContent = 'Completed ✓';
+    btn.className = 'btn-complete completed-btn';
+    btn.disabled = true;
+  } else {
+    btn.innerHTML = 'Got it! ✓';
+    btn.className = 'btn-complete';
+    btn.disabled = false;
+  }
+
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.classList.remove('closing');
+  backdrop.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeModal() {
+  const backdrop = document.getElementById('modal-backdrop');
+  backdrop.classList.add('closing');
+  document.body.style.overflow = '';
+  setTimeout(() => {
+    backdrop.classList.remove('active', 'closing');
+    currentModalId = null;
+  }, 250);
+}
+
+function toggleDetails() {
+  const content = document.getElementById('learn-more-content');
+  const toggle = document.getElementById('learn-more-toggle');
+  content.classList.toggle('expanded');
+  toggle.classList.toggle('expanded');
+}
+
+/* ============================================
+   COMPLETE NODE
+   ============================================ */
+function completeNode(id) {
+  if (completedIds.includes(id)) return;
+
+  completedIds.push(id);
+  saveProgress();
+
+  // Close modal
+  closeModal();
+
+  // Re-render
+  setTimeout(() => {
+    renderTree();
+    renderProgress();
+
+    // Sparkle effect on completed node
+    createSparkles(id);
+
+    // Unlock animation on next node
+    const nextNode = document.querySelector(`.node[data-id="${id + 1}"]`);
+    if (nextNode) {
+      nextNode.classList.add('unlock-anim');
+    }
+
+    // Scroll to next node
+    setTimeout(() => {
+      const nextRow = document.getElementById(`node-row-${id + 1}`);
+      if (nextRow) {
+        nextRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 400);
+
+    // Check milestones
+    checkMilestone(false);
+
+    // Final completion
+    if (completedIds.length >= NODES.length) {
+      setTimeout(() => showConfetti(), 600);
+    }
+  }, 300);
+}
+
+/* ============================================
+   SPARKLE EFFECT
+   ============================================ */
+function createSparkles(nodeId) {
+  const nodeEl = document.querySelector(`.node[data-id="${nodeId}"]`);
+  if (!nodeEl) return;
+
+  const colors = ['#58a6ff', '#bc8cff', '#3fb950', '#d29922', '#f0f6fc'];
+  
+  for (let i = 0; i < 12; i++) {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    const angle = (i / 12) * 360;
+    const distance = 30 + Math.random() * 25;
+    const tx = Math.cos(angle * Math.PI / 180) * distance;
+    const ty = Math.sin(angle * Math.PI / 180) * distance;
+    sparkle.style.cssText = `
+      --tx: ${tx}px;
+      --ty: ${ty}px;
+      background: ${colors[i % colors.length]};
+      left: 50%;
+      top: 50%;
+      margin-left: -3px;
+      margin-top: -3px;
+    `;
+    nodeEl.appendChild(sparkle);
+    setTimeout(() => sparkle.remove(), 800);
+  }
+}
+
+/* ============================================
+   MASCOT MESSAGES
+   ============================================ */
+function checkMilestone(initial) {
+  const count = completedIds.length;
+  const total = NODES.length;
+  const pct = Math.round((count / total) * 100);
+
+  if (initial && count === 0) return;
+  if (initial && count > 0 && count < total) {
+    showMascot(`Welcome back! You're <strong>${pct}%</strong> through. Keep going!`);
+    return;
+  }
+  if (initial) return;
+
+  if (count === 1) {
+    showMascot(`First one down! <strong>${total - 1} to go.</strong> You're already ahead of most people who never read docs. 🐴`);
+  } else if (pct >= 100) {
+    showMascot(`<strong>YOU DID IT!</strong> You now know more about Hoofy than most horses know about hay. I'm proud of you. 🏆`);
+  } else if (pct >= 75) {
+    showMascot(`<strong>${pct}%!</strong> You're in the home stretch! The finish line smells like victory (and oats). 🐴`);
+  } else if (pct >= 50) {
+    showMascot(`<strong>Halfway there!</strong> You know more about AI tooling than 90% of developers. No cap. 🐴`);
+  } else if (pct >= 25) {
+    showMascot(`<strong>${pct}% done!</strong> The foundations are solid. Now the fun stuff begins. 🐴`);
+  }
+}
+
+function showMascot(msg) {
+  const mascot = document.getElementById('mascot');
+  document.getElementById('mascot-msg').innerHTML = msg;
+  mascot.classList.add('visible');
+
+  clearTimeout(mascotTimer);
+  mascotTimer = setTimeout(() => {
+    mascot.classList.remove('visible');
+  }, 5000);
+}
+
+/* ============================================
+   CONFETTI
+   ============================================ */
+function showConfetti() {
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = [];
+  const colors = ['#58a6ff', '#bc8cff', '#3fb950', '#d29922', '#f85149', '#f0f6fc'];
+
+  for (let i = 0; i < 150; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height * -1,
+      w: 4 + Math.random() * 8,
+      h: 4 + Math.random() * 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 3,
+      vy: 2 + Math.random() * 4,
+      rot: Math.random() * 360,
+      rotV: (Math.random() - 0.5) * 10,
+      opacity: 1,
+      decay: 0.003 + Math.random() * 0.005
+    });
+  }
+
+  let running = true;
+
+  function animate() {
+    if (!running) { ctx.clearRect(0, 0, canvas.width, canvas.height); return; }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let alive = 0;
+    particles.forEach(p => {
+      if (p.opacity <= 0) return;
+      alive++;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.1;
+      p.rot += p.rotV;
+      p.opacity -= p.decay;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI / 180);
+      ctx.globalAlpha = Math.max(0, p.opacity);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+
+    if (alive > 0) {
+      requestAnimationFrame(animate);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      running = false;
+    }
+  }
+
+  animate();
+  setTimeout(() => { running = false; }, 6000);
+}
+
+/* ============================================
+   RESET
+   ============================================ */
+function resetProgress() {
+  if (!confirm('Reset all progress? This cannot be undone.')) return;
+  completedIds = [];
+  saveProgress();
+  renderTree();
+  renderProgress();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ============================================
+   EVENT BINDING
+   ============================================ */
+function bindEvents() {
+  // Node clicks (delegated)
+  document.getElementById('skill-tree').addEventListener('click', (e) => {
+    const node = e.target.closest('.node');
+    if (!node) return;
+    const id = parseInt(node.dataset.id);
+    if (getNodeState(id) !== 'locked') openModal(id);
+  });
+
+  // Keyboard on nodes
+  document.getElementById('skill-tree').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const node = e.target.closest('.node');
+      if (!node) return;
+      e.preventDefault();
+      const id = parseInt(node.dataset.id);
+      if (getNodeState(id) !== 'locked') openModal(id);
+    }
+  });
+
+  // Modal close
+  document.getElementById('modal-close').addEventListener('click', closeModal);
+  document.getElementById('modal-backdrop').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeModal();
+  });
+
+  // Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && currentModalId !== null) closeModal();
+  });
+
+  // Learn more toggle
+  document.getElementById('learn-more-toggle').addEventListener('click', toggleDetails);
+
+  // Complete button
+  document.getElementById('btn-complete').addEventListener('click', () => {
+    if (currentModalId !== null && !completedIds.includes(currentModalId)) {
+      completeNode(currentModalId);
+    }
+  });
+
+  // Reset
+  document.getElementById('btn-reset').addEventListener('click', resetProgress);
+
+  // Mascot dismiss on click
+  document.getElementById('mascot').addEventListener('click', () => {
+    document.getElementById('mascot').classList.remove('visible');
+  });
+}
+
+/* ============================================
+   BOOT
+   ============================================ */
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
