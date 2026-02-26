@@ -24,7 +24,6 @@
   <a href="docs/workflow-guide.md">Workflow Guide</a> ·
   <a href="docs/tool-reference.md">Tool Reference</a> ·
   <a href="docs/research-foundations.md">Research Foundations</a> ·
-  <a href="https://news.ycombinator.com/item?id=47158567">Hacker News</a>
 </p>
 
 <p align="center">
