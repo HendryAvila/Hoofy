@@ -174,7 +174,7 @@ func New() (*server.MCPServer, func(), error) {
 // is disabled or hasn't been initialized.
 func noop() {}
 
-// registerMemoryTools registers all 18 memory MCP tools with the server.
+// registerMemoryTools registers all 19 memory MCP tools with the server.
 func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 	// --- Session lifecycle ---
 	sessionStart := memtools.NewSessionStartTool(ms)
@@ -222,6 +222,10 @@ func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 
 	suggestKey := memtools.NewSuggestTopicKeyTool()
 	s.AddTool(suggestKey.Definition(), suggestKey.Handle)
+
+	// --- Compaction ---
+	compactTool := memtools.NewCompactTool(ms)
+	s.AddTool(compactTool.Definition(), compactTool.Handle)
 
 	// --- Statistics ---
 	statsTool := memtools.NewStatsTool(ms)
@@ -487,6 +491,33 @@ Unlike session summaries (end-of-session), progress tracks WHERE YOU ARE mid-ses
 {"goal": "...", "completed": ["..."], "next_steps": ["..."], "blockers": ["..."]}
 
 One active progress per project — each write replaces the previous one.
+
+### Memory Compaction (mem_compact)
+Use mem_compact to identify and clean up stale observations that add noise to memory.
+Over time, memory accumulates old session notes, outdated discoveries, and superseded
+decisions. Compaction keeps memory lean and relevant.
+
+**Dual behavior**:
+- Identify: mem_compact(older_than_days=90) — lists stale candidates without deleting
+- Execute: mem_compact(older_than_days=90, compact_ids="[1,2,3]") — batch soft-deletes
+
+**Workflow** (two-step process):
+1. Call mem_compact WITHOUT compact_ids to review candidates
+2. Review the list — decide which observations are truly stale
+3. Optionally write a summary to preserve key knowledge
+4. Call mem_compact WITH compact_ids (and optional summary_title/summary_content)
+
+**When to suggest compaction**:
+- When mem_context returns many old, low-value observations
+- When a user complains about memory noise or irrelevant results
+- After a major milestone (v1 shipped, refactor complete) — clean up WIP notes
+- When observation count exceeds 200+ for a project
+
+**Summary observations**:
+When compacting, create a summary to preserve the essence of what was deleted:
+- summary_title: "Compacted 15 pre-v1 session notes"
+- summary_content: Key decisions and patterns extracted from the deleted observations
+- The summary is saved as type "compaction_summary" — searchable via mem_search
 
 ### Topic Keys for Evolving Observations
 Use topic_key when an observation should UPDATE over time (not create duplicates):

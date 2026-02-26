@@ -2,6 +2,7 @@ package memtools
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -1801,6 +1802,149 @@ func TestTimelineTool_NavigationHint_WhenWindowSmaller(t *testing.T) {
 	}
 	if !strings.Contains(text, "Increase before/after") {
 		t.Errorf("expected hint about increasing before/after, got: %s", text)
+	}
+}
+
+// ─── CompactTool ─────────────────────────────────────────────────────────────
+
+func TestCompactTool_IdentifyMode_NoStaleFound(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+	seedObservation(t, store, "Fresh obs", "content", "proj")
+
+	tool := NewCompactTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"project":         "proj",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "No stale observations found") {
+		t.Errorf("expected 'no stale' message, got: %s", text)
+	}
+}
+
+func TestCompactTool_IdentifyMode_MissingDays(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewCompactTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{}))
+	mustBeToolError(t, r, err, "older_than_days")
+}
+
+func TestCompactTool_IdentifyMode_ZeroDays(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewCompactTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(0),
+	}))
+	mustBeToolError(t, r, err, "must be > 0")
+}
+
+func TestCompactTool_ExecuteMode_InvalidJSON(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewCompactTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"compact_ids":     "not valid json",
+	}))
+	mustBeToolError(t, r, err, "valid JSON array")
+}
+
+func TestCompactTool_ExecuteMode_EmptyArray(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewCompactTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"compact_ids":     "[]",
+	}))
+	mustBeToolError(t, r, err, "empty")
+}
+
+func TestCompactTool_ExecuteMode_SummaryContentWithoutTitle(t *testing.T) {
+	store := newTestStore(t)
+	tool := NewCompactTool(store)
+
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"compact_ids":     "[1]",
+		"summary_content": "some content",
+	}))
+	mustBeToolError(t, r, err, "summary_title")
+}
+
+func TestCompactTool_ExecuteMode_BasicCompaction(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+	id1 := seedObservation(t, store, "Compact me", "old content", "proj")
+
+	tool := NewCompactTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"compact_ids":     fmt.Sprintf("[%d]", id1),
+		"project":         "proj",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Compaction Complete") {
+		t.Errorf("expected compaction complete message, got: %s", text)
+	}
+	if !strings.Contains(text, "Deleted") {
+		t.Errorf("expected deleted count in response, got: %s", text)
+	}
+}
+
+func TestCompactTool_ExecuteMode_WithSummary(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+	seedManualSession(t, store)
+	id1 := seedObservation(t, store, "Compact me", "old content", "proj")
+
+	tool := NewCompactTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"compact_ids":     fmt.Sprintf("[%d]", id1),
+		"project":         "proj",
+		"summary_title":   "Consolidated old notes",
+		"summary_content": "These were old session notes.",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "Compaction Complete") {
+		t.Errorf("expected compaction complete, got: %s", text)
+	}
+	if !strings.Contains(text, "compaction_summary") {
+		t.Errorf("expected summary type in response, got: %s", text)
+	}
+}
+
+func TestCompactTool_ExecuteMode_SkippedWarning(t *testing.T) {
+	store := newTestStore(t)
+	seedSession(t, store, "test-session", "proj")
+	id1 := seedObservation(t, store, "Will delete", "content", "proj")
+
+	// Soft-delete first
+	if err := store.DeleteObservation(id1, false); err != nil {
+		t.Fatalf("pre-delete: %v", err)
+	}
+
+	tool := NewCompactTool(store)
+	r, err := tool.Handle(ctx, makeReq(map[string]interface{}{
+		"older_than_days": float64(30),
+		"compact_ids":     fmt.Sprintf("[%d]", id1),
+		"project":         "proj",
+	}))
+	mustNotError(t, r, err)
+	text := resultText(r)
+
+	if !strings.Contains(text, "skipped") {
+		t.Errorf("expected skipped warning for already-deleted obs, got: %s", text)
 	}
 }
 

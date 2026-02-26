@@ -924,6 +924,149 @@ func (s *Store) DeleteObservation(id int64, hardDelete bool) error {
 	return err
 }
 
+// ─── Compaction ──────────────────────────────────────────────────────────────
+
+// CompactParams holds the input for batch compaction of observations.
+type CompactParams struct {
+	IDs            []int64 `json:"ids"`
+	SummaryTitle   string  `json:"summary_title,omitempty"`
+	SummaryContent string  `json:"summary_content,omitempty"`
+	Project        string  `json:"project,omitempty"`
+	Scope          string  `json:"scope,omitempty"`
+	SessionID      string  `json:"session_id,omitempty"`
+}
+
+// CompactResult holds the output of a compaction operation.
+type CompactResult struct {
+	DeletedCount int    `json:"deleted_count"`
+	SummaryID    *int64 `json:"summary_id,omitempty"`
+	TotalBefore  int    `json:"total_before"`
+	TotalAfter   int    `json:"total_after"`
+}
+
+// FindStaleObservations returns non-deleted observations older than the
+// specified number of days, filtered by project and scope. Results are
+// ordered oldest-first so the caller can prioritize the stalest entries.
+func (s *Store) FindStaleObservations(project, scope string, olderThanDays, limit int) ([]Observation, error) {
+	if olderThanDays <= 0 {
+		return nil, fmt.Errorf("olderThanDays must be > 0, got %d", olderThanDays)
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	query := `
+		SELECT o.id, o.session_id, o.type, o.title, o.content, o.tool_name, o.project,
+		       o.scope, o.topic_key, o.revision_count, o.duplicate_count, o.last_seen_at, o.created_at, o.updated_at, o.deleted_at
+		FROM observations o
+		WHERE o.deleted_at IS NULL
+		  AND datetime(o.created_at) < datetime('now', ?)
+	`
+	args := []any{fmt.Sprintf("-%d days", olderThanDays)}
+
+	if project != "" {
+		query += " AND o.project = ?"
+		args = append(args, project)
+	}
+	if scope != "" {
+		query += " AND o.scope = ?"
+		args = append(args, normalizeScope(scope))
+	}
+
+	query += " ORDER BY o.created_at ASC LIMIT ?"
+	args = append(args, limit)
+
+	return s.queryObservations(query, args...)
+}
+
+// CompactObservations batch soft-deletes the given observation IDs and
+// optionally creates a summary observation as a replacement.
+// The entire operation is atomic — if the summary insert fails, the
+// soft-deletes are rolled back.
+func (s *Store) CompactObservations(p CompactParams) (*CompactResult, error) {
+	if len(p.IDs) == 0 {
+		return nil, fmt.Errorf("no observation IDs provided")
+	}
+	if len(p.IDs) > 200 {
+		return nil, fmt.Errorf("cannot compact more than 200 observations at once, got %d", len(p.IDs))
+	}
+	if p.SummaryContent != "" && p.SummaryTitle == "" {
+		return nil, fmt.Errorf("summary_content requires summary_title")
+	}
+
+	scope := normalizeScope(p.Scope)
+
+	// Count before compaction
+	totalBefore, err := s.CountObservations(p.Project, scope)
+	if err != nil {
+		return nil, fmt.Errorf("counting observations before compaction: %w", err)
+	}
+
+	tx, err := s.beginTxHook()
+	if err != nil {
+		return nil, fmt.Errorf("begin compaction transaction: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// Batch soft-delete: only non-deleted observations
+	deleted := 0
+	for _, id := range p.IDs {
+		res, err := s.execHook(tx,
+			`UPDATE observations
+			 SET deleted_at = datetime('now'),
+			     updated_at = datetime('now')
+			 WHERE id = ? AND deleted_at IS NULL`,
+			id,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("soft-deleting observation %d: %w", id, err)
+		}
+		n, _ := res.RowsAffected()
+		deleted += int(n)
+	}
+
+	result := &CompactResult{
+		DeletedCount: deleted,
+		TotalBefore:  totalBefore,
+	}
+
+	// Optionally create summary observation
+	if p.SummaryTitle != "" {
+		sessionID := p.SessionID
+		if sessionID == "" {
+			sessionID = "manual-save"
+		}
+
+		summaryRes, err := s.execHook(tx,
+			`INSERT INTO observations (session_id, type, title, content, tool_name, project, scope, topic_key, normalized_hash, revision_count, duplicate_count, last_seen_at, updated_at)
+			 VALUES (?, ?, ?, ?, NULL, ?, ?, NULL, ?, 1, 1, datetime('now'), datetime('now'))`,
+			sessionID, "compaction_summary", p.SummaryTitle, p.SummaryContent,
+			nullableString(p.Project), scope, hashNormalized(p.SummaryContent),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("creating compaction summary: %w", err)
+		}
+		summaryID, _ := summaryRes.LastInsertId()
+		result.SummaryID = &summaryID
+	}
+
+	if err := s.commitHook(tx); err != nil {
+		return nil, fmt.Errorf("commit compaction transaction: %w", err)
+	}
+
+	// Count after compaction (outside tx, reads committed state)
+	totalAfter, err := s.CountObservations(p.Project, scope)
+	if err != nil {
+		return nil, fmt.Errorf("counting observations after compaction: %w", err)
+	}
+	result.TotalAfter = totalAfter
+
+	return result, nil
+}
+
 // ─── Relations ───────────────────────────────────────────────────────────────
 
 // AddRelation creates a typed directional edge between two observations.

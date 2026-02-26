@@ -1130,16 +1130,22 @@ func TestCountObservations_WithData(t *testing.T) {
 	ensureSession(t, s, "s2", "proj-b")
 
 	for i := 0; i < 5; i++ {
-		s.AddObservation(memory.AddObservationParams{
+		_, err := s.AddObservation(memory.AddObservationParams{
 			SessionID: "s1", Type: "manual", Title: fmt.Sprintf("A-%d", i),
 			Content: fmt.Sprintf("Content A %d unique", i), Project: "proj-a",
 		})
+		if err != nil {
+			t.Fatalf("AddObservation A-%d: %v", i, err)
+		}
 	}
 	for i := 0; i < 3; i++ {
-		s.AddObservation(memory.AddObservationParams{
+		_, err := s.AddObservation(memory.AddObservationParams{
 			SessionID: "s2", Type: "decision", Title: fmt.Sprintf("B-%d", i),
 			Content: fmt.Sprintf("Content B %d unique", i), Project: "proj-b", Scope: "personal",
 		})
+		if err != nil {
+			t.Fatalf("AddObservation B-%d: %v", i, err)
+		}
 	}
 
 	// Unfiltered
@@ -1175,10 +1181,13 @@ func TestCountObservations_ExcludesSoftDeleted(t *testing.T) {
 		SessionID: "s1", Type: "manual", Title: "Will delete",
 		Content: "To be deleted", Project: "proj",
 	})
-	s.AddObservation(memory.AddObservationParams{
+	_, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "s1", Type: "manual", Title: "Keep",
 		Content: "Still here", Project: "proj",
 	})
+	if err != nil {
+		t.Fatalf("AddObservation Keep: %v", err)
+	}
 	_ = s.DeleteObservation(id, false)
 
 	count, _ := s.CountObservations("proj", "")
@@ -1194,15 +1203,21 @@ func TestCountSearchResults_FTS(t *testing.T) {
 	ensureSession(t, s, "s1", "proj")
 
 	for i := 0; i < 5; i++ {
-		s.AddObservation(memory.AddObservationParams{
+		_, err := s.AddObservation(memory.AddObservationParams{
 			SessionID: "s1", Type: "manual", Title: fmt.Sprintf("Alpha-%d", i),
 			Content: fmt.Sprintf("Alpha search target %d unique", i), Project: "proj",
 		})
+		if err != nil {
+			t.Fatalf("AddObservation Alpha-%d: %v", i, err)
+		}
 	}
-	s.AddObservation(memory.AddObservationParams{
+	_, err := s.AddObservation(memory.AddObservationParams{
 		SessionID: "s1", Type: "manual", Title: "Beta",
 		Content: "Beta different content", Project: "proj",
 	})
+	if err != nil {
+		t.Fatalf("AddObservation Beta: %v", err)
+	}
 
 	// Count FTS matches for "Alpha"
 	count, err := s.CountSearchResults("Alpha", memory.SearchOptions{})
@@ -1225,10 +1240,13 @@ func TestCountSearchResults_EmptyQuery(t *testing.T) {
 	ensureSession(t, s, "s1", "proj")
 
 	for i := 0; i < 3; i++ {
-		s.AddObservation(memory.AddObservationParams{
+		_, err := s.AddObservation(memory.AddObservationParams{
 			SessionID: "s1", Type: "manual", Title: fmt.Sprintf("Obs-%d", i),
 			Content: fmt.Sprintf("Content %d unique", i), Project: "proj",
 		})
+		if err != nil {
+			t.Fatalf("AddObservation Obs-%d: %v", i, err)
+		}
 	}
 
 	// Empty query falls back to count all
@@ -2356,6 +2374,321 @@ func mustAddRel(t *testing.T, s *memory.Store, fromID, toID int64, relType strin
 	t.Helper()
 	if _, err := s.AddRelation(memory.AddRelationParams{FromID: fromID, ToID: toID, Type: relType}); err != nil {
 		t.Fatalf("AddRelation %d→%d (%s): %v", fromID, toID, relType, err)
+	}
+}
+
+// ─── Compaction ──────────────────────────────────────────────────────────────
+
+// ageObservation backdates an observation's created_at by the given number of days.
+func ageObservation(t *testing.T, s *memory.Store, id int64, days int) {
+	t.Helper()
+	_, err := s.DB().Exec(
+		`UPDATE observations SET created_at = datetime('now', ?) WHERE id = ?`,
+		fmt.Sprintf("-%d days", days), id,
+	)
+	if err != nil {
+		t.Fatalf("ageObservation(%d, %d days): %v", id, days, err)
+	}
+}
+
+func TestFindStaleObservations_Basic(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	// Create 3 observations: 2 old (>30 days), 1 fresh
+	id1 := mustAddObs(t, s, "s1", "Old one", "content-1", "proj")
+	id2 := mustAddObs(t, s, "s1", "Old two", "content-2", "proj")
+	_ = mustAddObs(t, s, "s1", "Fresh", "content-3", "proj")
+
+	ageObservation(t, s, id1, 45)
+	ageObservation(t, s, id2, 60)
+
+	stale, err := s.FindStaleObservations("proj", "", 30, 50)
+	if err != nil {
+		t.Fatalf("FindStaleObservations: %v", err)
+	}
+	if len(stale) != 2 {
+		t.Fatalf("got %d stale observations, want 2", len(stale))
+	}
+	// Oldest first
+	if stale[0].ID != id2 {
+		t.Errorf("first stale should be oldest (id %d), got id %d", id2, stale[0].ID)
+	}
+	if stale[1].ID != id1 {
+		t.Errorf("second stale should be id %d, got id %d", id1, stale[1].ID)
+	}
+}
+
+func TestFindStaleObservations_FiltersByProject(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj-a")
+	ensureSession(t, s, "s2", "proj-b")
+
+	idA := mustAddObs(t, s, "s1", "Old A", "content-a", "proj-a")
+	idB, err := s.AddObservation(memory.AddObservationParams{
+		SessionID: "s2", Type: "manual", Title: "Old B", Content: "content-b", Project: "proj-b", Scope: "project",
+	})
+	if err != nil {
+		t.Fatalf("add obs B: %v", err)
+	}
+
+	ageObservation(t, s, idA, 40)
+	ageObservation(t, s, idB, 40)
+
+	stale, err := s.FindStaleObservations("proj-a", "", 30, 50)
+	if err != nil {
+		t.Fatalf("FindStaleObservations: %v", err)
+	}
+	if len(stale) != 1 {
+		t.Fatalf("got %d, want 1 (only proj-a)", len(stale))
+	}
+	if stale[0].ID != idA {
+		t.Errorf("expected id %d, got %d", idA, stale[0].ID)
+	}
+}
+
+func TestFindStaleObservations_RespectsLimit(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	for i := 0; i < 5; i++ {
+		id := mustAddObs(t, s, "s1", fmt.Sprintf("Old-%d", i), fmt.Sprintf("content-%d", i), "proj")
+		ageObservation(t, s, id, 90)
+	}
+
+	stale, err := s.FindStaleObservations("proj", "", 30, 3)
+	if err != nil {
+		t.Fatalf("FindStaleObservations: %v", err)
+	}
+	if len(stale) != 3 {
+		t.Fatalf("got %d, want 3 (limit)", len(stale))
+	}
+}
+
+func TestFindStaleObservations_InvalidDays(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.FindStaleObservations("", "", 0, 10)
+	if err == nil {
+		t.Fatal("expected error for olderThanDays=0")
+	}
+	_, err = s.FindStaleObservations("", "", -5, 10)
+	if err == nil {
+		t.Fatal("expected error for olderThanDays=-5")
+	}
+}
+
+func TestFindStaleObservations_ExcludesDeleted(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	id := mustAddObs(t, s, "s1", "Old deleted", "content", "proj")
+	ageObservation(t, s, id, 90)
+	if err := s.DeleteObservation(id, false); err != nil {
+		t.Fatalf("soft-delete: %v", err)
+	}
+
+	stale, err := s.FindStaleObservations("proj", "", 30, 50)
+	if err != nil {
+		t.Fatalf("FindStaleObservations: %v", err)
+	}
+	if len(stale) != 0 {
+		t.Fatalf("got %d, want 0 (deleted obs excluded)", len(stale))
+	}
+}
+
+func TestCompactObservations_BasicSoftDelete(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	id1 := mustAddObs(t, s, "s1", "Compact me 1", "content-1", "proj")
+	id2 := mustAddObs(t, s, "s1", "Compact me 2", "content-2", "proj")
+	_ = mustAddObs(t, s, "s1", "Keep me", "content-3", "proj")
+
+	result, err := s.CompactObservations(memory.CompactParams{
+		IDs:     []int64{id1, id2},
+		Project: "proj",
+		Scope:   "project",
+	})
+	if err != nil {
+		t.Fatalf("CompactObservations: %v", err)
+	}
+
+	if result.DeletedCount != 2 {
+		t.Errorf("deleted_count = %d, want 2", result.DeletedCount)
+	}
+	if result.SummaryID != nil {
+		t.Errorf("summary_id should be nil when no summary requested")
+	}
+	if result.TotalBefore != 3 {
+		t.Errorf("total_before = %d, want 3", result.TotalBefore)
+	}
+	if result.TotalAfter != 1 {
+		t.Errorf("total_after = %d, want 1", result.TotalAfter)
+	}
+
+	// Verify soft-deleted observations are not visible
+	obs, err := s.GetObservation(id1)
+	if err == nil && obs != nil {
+		t.Errorf("expected observation %d to be hidden after soft-delete", id1)
+	}
+}
+
+func TestCompactObservations_WithSummary(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+	ensureSession(t, s, "manual-save", "")
+
+	id1 := mustAddObs(t, s, "s1", "Compact me", "content-1", "proj")
+
+	result, err := s.CompactObservations(memory.CompactParams{
+		IDs:            []int64{id1},
+		SummaryTitle:   "Compacted 1 observation",
+		SummaryContent: "These were old session notes that were consolidated.",
+		Project:        "proj",
+		Scope:          "project",
+	})
+	if err != nil {
+		t.Fatalf("CompactObservations: %v", err)
+	}
+
+	if result.DeletedCount != 1 {
+		t.Errorf("deleted_count = %d, want 1", result.DeletedCount)
+	}
+	if result.SummaryID == nil {
+		t.Fatal("summary_id should not be nil when summary was requested")
+	}
+
+	// Verify summary observation exists and has correct metadata
+	summary, err := s.GetObservation(*result.SummaryID)
+	if err != nil {
+		t.Fatalf("GetObservation(%d): %v", *result.SummaryID, err)
+	}
+	if summary.Type != "compaction_summary" {
+		t.Errorf("summary type = %q, want %q", summary.Type, "compaction_summary")
+	}
+	if summary.Title != "Compacted 1 observation" {
+		t.Errorf("summary title = %q, want %q", summary.Title, "Compacted 1 observation")
+	}
+	if summary.Project == nil || *summary.Project != "proj" {
+		t.Errorf("summary project = %v, want %q", summary.Project, "proj")
+	}
+}
+
+func TestCompactObservations_SkipsAlreadyDeleted(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	id1 := mustAddObs(t, s, "s1", "Already deleted", "content", "proj")
+	if err := s.DeleteObservation(id1, false); err != nil {
+		t.Fatalf("soft-delete: %v", err)
+	}
+
+	result, err := s.CompactObservations(memory.CompactParams{
+		IDs:     []int64{id1},
+		Project: "proj",
+		Scope:   "project",
+	})
+	if err != nil {
+		t.Fatalf("CompactObservations: %v", err)
+	}
+	if result.DeletedCount != 0 {
+		t.Errorf("deleted_count = %d, want 0 (already deleted)", result.DeletedCount)
+	}
+}
+
+func TestCompactObservations_EmptyIDs(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.CompactObservations(memory.CompactParams{IDs: []int64{}})
+	if err == nil {
+		t.Fatal("expected error for empty IDs")
+	}
+}
+
+func TestCompactObservations_TooManyIDs(t *testing.T) {
+	s := newTestStore(t)
+	ids := make([]int64, 201)
+	for i := range ids {
+		ids[i] = int64(i + 1)
+	}
+	_, err := s.CompactObservations(memory.CompactParams{IDs: ids})
+	if err == nil {
+		t.Fatal("expected error for >200 IDs")
+	}
+}
+
+func TestCompactObservations_SummaryContentRequiresTitle(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.CompactObservations(memory.CompactParams{
+		IDs:            []int64{1},
+		SummaryContent: "some content",
+		// SummaryTitle intentionally omitted
+	})
+	if err == nil {
+		t.Fatal("expected error when summary_content is set without summary_title")
+	}
+}
+
+func TestCompactObservations_AtomicRollbackOnFailure(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	id1 := mustAddObs(t, s, "s1", "Should survive", "content", "proj")
+
+	// Try to compact with a summary that references a non-existent session.
+	// This triggers a FK constraint failure on the summary INSERT, which
+	// should roll back the soft-deletes too (atomicity).
+	_, err := s.CompactObservations(memory.CompactParams{
+		IDs:            []int64{id1},
+		SummaryTitle:   "Summary",
+		SummaryContent: "Consolidated notes",
+		Project:        "proj",
+		Scope:          "project",
+		SessionID:      "nonexistent-session",
+	})
+	if err == nil {
+		t.Fatal("expected error from FK constraint on nonexistent session")
+	}
+
+	// Verify the soft-delete was ROLLED BACK — observation should still exist
+	obs, getErr := s.GetObservation(id1)
+	if getErr != nil {
+		t.Fatalf("observation should still exist after rollback: %v", getErr)
+	}
+	if obs == nil {
+		t.Fatal("observation was soft-deleted despite transaction rollback — atomicity broken")
+	}
+}
+
+func TestCompactObservations_WithSessionID(t *testing.T) {
+	s := newTestStore(t)
+	ensureSession(t, s, "s1", "proj")
+
+	id1 := mustAddObs(t, s, "s1", "Compact me", "content", "proj")
+
+	result, err := s.CompactObservations(memory.CompactParams{
+		IDs:            []int64{id1},
+		SummaryTitle:   "Summary",
+		SummaryContent: "Consolidated notes",
+		Project:        "proj",
+		Scope:          "project",
+		SessionID:      "s1",
+	})
+	if err != nil {
+		t.Fatalf("CompactObservations: %v", err)
+	}
+	if result.DeletedCount != 1 {
+		t.Errorf("deleted_count = %d, want 1", result.DeletedCount)
+	}
+	if result.SummaryID == nil {
+		t.Fatal("summary should exist")
+	}
+
+	summary, err := s.GetObservation(*result.SummaryID)
+	if err != nil {
+		t.Fatalf("summary should exist: %v", err)
+	}
+	if summary.Type != "compaction_summary" {
+		t.Errorf("type = %q, want compaction_summary", summary.Type)
 	}
 }
 
