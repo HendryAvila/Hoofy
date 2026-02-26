@@ -1499,7 +1499,11 @@ function renderTree() {
   });
 
   // Draw SVG connectors after DOM is updated
-  requestAnimationFrame(renderConnectors);
+  requestAnimationFrame(() => {
+    renderConnectors();
+    // Re-observe new DOM nodes for scroll reveal
+    reobserveNodes();
+  });
 }
 
 /* ============================================
@@ -2012,24 +2016,39 @@ function initAmbientParticles() {
 /* ============================================
    SCROLL REVEAL (IntersectionObserver)
    ============================================ */
+let scrollRevealObserver = null;
+
 function initScrollReveal() {
-  const observer = new IntersectionObserver((entries) => {
+  scrollRevealObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
         const delay = entry.target.classList.contains('track-label') ? 0 : 80;
         setTimeout(() => {
           entry.target.classList.add('revealed');
         }, delay);
-        observer.unobserve(entry.target);
+        scrollRevealObserver.unobserve(entry.target);
       }
     });
   }, { threshold: 0.15, rootMargin: '0px 0px -30px 0px' });
 
-  // Observe all node-rows and track-labels
+  reobserveNodes();
+}
+
+/* Re-observe new DOM nodes after renderTree() recreates them */
+function reobserveNodes() {
+  if (!scrollRevealObserver) return;
+  const viewportBottom = window.innerHeight + 50;
   document.querySelectorAll('.node-row, .track-label').forEach((el, i) => {
-    // Add staggered delay via CSS custom property
-    el.style.transitionDelay = `${i * 60}ms`;
-    observer.observe(el);
+    if (el.classList.contains('revealed')) return; // already visible
+    // Nodes already in viewport get revealed immediately (no stagger delay)
+    const rect = el.getBoundingClientRect();
+    if (rect.top < viewportBottom) {
+      el.style.transitionDelay = '0ms';
+      el.classList.add('revealed');
+    } else {
+      el.style.transitionDelay = `${i * 60}ms`;
+      scrollRevealObserver.observe(el);
+    }
   });
 }
 
