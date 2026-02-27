@@ -327,7 +327,7 @@ func (t *BootstrapTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*m
 	if len(written) > 0 {
 		response.WriteString("## Written\n\n")
 		for _, w := range written {
-			response.WriteString(fmt.Sprintf("- ✅ `sdd/%s`\n", w))
+			fmt.Fprintf(&response, "- ✅ `sdd/%s`\n", w)
 		}
 		response.WriteString("\n")
 	}
@@ -335,7 +335,7 @@ func (t *BootstrapTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*m
 	if len(skipped) > 0 {
 		response.WriteString("## Skipped\n\n")
 		for _, s := range skipped {
-			response.WriteString(fmt.Sprintf("- ⏭️ `sdd/%s`\n", s))
+			fmt.Fprintf(&response, "- ⏭️ `sdd/%s`\n", s)
 		}
 		response.WriteString("\n")
 	}

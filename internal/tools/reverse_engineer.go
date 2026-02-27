@@ -595,15 +595,6 @@ var apiRoutePatterns = []string{
 	"api.py",
 }
 
-// apiRouteGlobs are glob patterns for route files in subdirectories.
-var apiRouteGlobs = []string{
-	"**/routes.go",
-	"**/router.go",
-	"**/routes.ts",
-	"**/router.ts",
-	"**/urls.py",
-}
-
 // scanAPIDefs detects and reads API definition files.
 func scanAPIDefs(root, detailLevel string) scanSection {
 	s := scanSection{title: "API Evidence"}
@@ -1105,17 +1096,17 @@ func (t *ReverseEngineerTool) Handle(ctx context.Context, req mcp.CallToolReques
 
 	// Metadata header.
 	report.WriteString("## Scan Metadata\n\n")
-	report.WriteString(fmt.Sprintf("- **Project root**: `%s`\n", root))
-	report.WriteString(fmt.Sprintf("- **Primary ecosystem**: %s\n", ecosystem))
+	fmt.Fprintf(&report, "- **Project root**: `%s`\n", root)
+	fmt.Fprintf(&report, "- **Primary ecosystem**: %s\n", ecosystem)
 	if len(monorepo) > 0 {
-		report.WriteString(fmt.Sprintf("- **Monorepo**: %s\n", strings.Join(monorepo, ", ")))
+		fmt.Fprintf(&report, "- **Monorepo**: %s\n", strings.Join(monorepo, ", "))
 	}
-	report.WriteString(fmt.Sprintf("- **Files scanned**: %d\n", totalRead))
+	fmt.Fprintf(&report, "- **Files scanned**: %d\n", totalRead)
 	if totalSkipped > 0 {
-		report.WriteString(fmt.Sprintf("- **Files skipped**: %d\n", totalSkipped))
+		fmt.Fprintf(&report, "- **Files skipped**: %d\n", totalSkipped)
 	}
-	report.WriteString(fmt.Sprintf("- **Scan duration**: %s\n", duration.Round(time.Millisecond)))
-	report.WriteString(fmt.Sprintf("- **Detail level**: %s\n\n", detailLevel))
+	fmt.Fprintf(&report, "- **Scan duration**: %s\n", duration.Round(time.Millisecond))
+	fmt.Fprintf(&report, "- **Detail level**: %s\n\n", detailLevel)
 
 	// Check existing artifacts.
 	hasReqs := ArtifactExists(root, "specify")
@@ -1144,7 +1135,7 @@ func (t *ReverseEngineerTool) Handle(ctx context.Context, req mcp.CallToolReques
 			missing++
 		}
 		if missing > 0 {
-			report.WriteString(fmt.Sprintf("\n⚠️ **%d artifact(s) missing** — generate only the missing ones.\n\n", missing))
+			fmt.Fprintf(&report, "\n⚠️ **%d artifact(s) missing** — generate only the missing ones.\n\n", missing)
 		} else {
 			report.WriteString("\n✅ All artifacts exist. No bootstrap needed.\n\n")
 		}
@@ -1152,7 +1143,7 @@ func (t *ReverseEngineerTool) Handle(ctx context.Context, req mcp.CallToolReques
 
 	// Append each section.
 	for _, s := range sections {
-		report.WriteString(fmt.Sprintf("## %s\n\n", s.title))
+		fmt.Fprintf(&report, "## %s\n\n", s.title)
 		report.WriteString(s.content)
 		report.WriteString("\n\n")
 	}
