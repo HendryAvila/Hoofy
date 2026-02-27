@@ -10,7 +10,7 @@ Foundational patterns for agent design. Distinguishes workflows from agents, int
 
 | Recommendation | Hoofy Implementation |
 |---|---|
-| "Agent-Computer Interface (ACI) is as important as HCI" — tool descriptions and parameters are critical for AI usability | All 34 tools use consistent `sdd_*` and `mem_*` namespacing with self-documenting parameter descriptions |
+| "Agent-Computer Interface (ACI) is as important as HCI" — tool descriptions and parameters are critical for AI usability | All 36 tools use consistent `sdd_*` and `mem_*` namespacing with self-documenting parameter descriptions |
 | "Do the simplest thing that works" — avoid over-engineering agent systems | Adaptive change pipeline selects only the stages needed (4-7 stages based on type x size), instead of forcing a one-size-fits-all workflow |
 | Orchestrator-worker pattern for complex tasks | Project pipeline uses sequential orchestration: propose → specify → clarify → design → tasks → validate |
 | Evaluator-optimizer pattern for iterative refinement | Clarity Gate blocks pipeline advancement until clarity score meets threshold, forcing iterative requirement refinement |

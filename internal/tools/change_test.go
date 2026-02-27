@@ -37,10 +37,31 @@ func setupChangeProject(t *testing.T) (string, func()) {
 	return tmpDir, cleanup
 }
 
+// setupChangeProjectWithArtifacts creates a change project with a dummy
+// SDD artifact so that medium/large changes pass the artifact guard.
+func setupChangeProjectWithArtifacts(t *testing.T) (string, func()) {
+	t.Helper()
+	tmpDir, cleanup := setupChangeProject(t)
+	addDummyArtifact(t, tmpDir)
+	return tmpDir, cleanup
+}
+
+// addDummyArtifact creates a minimal requirements.md in the sdd/ directory
+// so that CheckSDDArtifacts returns true (artifact guard passes).
+func addDummyArtifact(t *testing.T, projectRoot string) {
+	t.Helper()
+	path := filepath.Join(projectRoot, "sdd", "requirements.md")
+	if err := os.WriteFile(path, []byte("# Requirements\n\nDummy artifact for testing.\n"), 0o644); err != nil {
+		t.Fatalf("setup: write dummy artifact: %v", err)
+	}
+}
+
 // createActiveChange sets up a change project with an active change.
+// Adds a dummy artifact so the artifact guard passes for any size.
 func createActiveChange(t *testing.T, ct changes.ChangeType, cs changes.ChangeSize, desc string) (string, func(), *changes.ChangeRecord) {
 	t.Helper()
 	tmpDir, cleanup := setupChangeProject(t)
+	addDummyArtifact(t, tmpDir)
 
 	store := changes.NewFileStore()
 	flow, err := changes.StageFlow(ct, cs)
@@ -125,7 +146,7 @@ func TestChangeTool_Handle_Success(t *testing.T) {
 }
 
 func TestChangeTool_Handle_CreatesFiles(t *testing.T) {
-	tmpDir, cleanup := setupChangeProject(t)
+	tmpDir, cleanup := setupChangeProjectWithArtifacts(t)
 	defer cleanup()
 
 	store := changes.NewFileStore()
@@ -280,7 +301,7 @@ func TestChangeTool_Handle_AllTypeSizeCombinations(t *testing.T) {
 	for _, ct := range types {
 		for _, cs := range sizes {
 			t.Run(string(ct)+"/"+string(cs), func(t *testing.T) {
-				_, cleanup := setupChangeProject(t)
+				_, cleanup := setupChangeProjectWithArtifacts(t)
 				defer cleanup()
 
 				store := changes.NewFileStore()
@@ -312,5 +333,128 @@ func TestChangeTool_Definition(t *testing.T) {
 
 	if def.Name != "sdd_change" {
 		t.Errorf("name = %q, want sdd_change", def.Name)
+	}
+}
+
+// --- Artifact guard tests (TASK-006) ---
+
+func TestChangeTool_Handle_NoArtifacts_SmallProceeds(t *testing.T) {
+	_, cleanup := setupChangeProject(t) // no artifacts
+	defer cleanup()
+
+	store := changes.NewFileStore()
+	tool := NewChangeTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"type":        "fix",
+		"size":        "small",
+		"description": "Quick typo fix",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("small change should proceed without artifacts, got error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+	if !strings.Contains(text, "Change Created") {
+		t.Error("result should contain 'Change Created'")
+	}
+	if !strings.Contains(text, "No SDD artifacts found") {
+		t.Error("result should contain warning about missing artifacts")
+	}
+	if !strings.Contains(text, "sdd_reverse_engineer") {
+		t.Error("warning should mention sdd_reverse_engineer")
+	}
+}
+
+func TestChangeTool_Handle_NoArtifacts_MediumBlocked(t *testing.T) {
+	_, cleanup := setupChangeProject(t) // no artifacts
+	defer cleanup()
+
+	store := changes.NewFileStore()
+	tool := NewChangeTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"type":        "feature",
+		"size":        "medium",
+		"description": "Add auth module",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if !isErrorResult(result) {
+		t.Error("medium change should be blocked without artifacts")
+	}
+
+	text := getResultText(result)
+	if !strings.Contains(text, "No SDD artifacts found") {
+		t.Errorf("error should mention missing artifacts: %s", text)
+	}
+	if !strings.Contains(text, "sdd_reverse_engineer") {
+		t.Errorf("error should mention sdd_reverse_engineer: %s", text)
+	}
+}
+
+func TestChangeTool_Handle_NoArtifacts_LargeBlocked(t *testing.T) {
+	_, cleanup := setupChangeProject(t) // no artifacts
+	defer cleanup()
+
+	store := changes.NewFileStore()
+	tool := NewChangeTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"type":        "enhancement",
+		"size":        "large",
+		"description": "Major rework",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if !isErrorResult(result) {
+		t.Error("large change should be blocked without artifacts")
+	}
+
+	text := getResultText(result)
+	if !strings.Contains(text, "No SDD artifacts found") {
+		t.Errorf("error should mention missing artifacts: %s", text)
+	}
+}
+
+func TestChangeTool_Handle_WithArtifacts_NoWarning(t *testing.T) {
+	_, cleanup := setupChangeProjectWithArtifacts(t)
+	defer cleanup()
+
+	store := changes.NewFileStore()
+	tool := NewChangeTool(store)
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"type":        "fix",
+		"size":        "small",
+		"description": "Small fix with artifacts",
+	}
+
+	result, err := tool.Handle(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Handle failed: %v", err)
+	}
+	if isErrorResult(result) {
+		t.Fatalf("should succeed, got error: %s", getResultText(result))
+	}
+
+	text := getResultText(result)
+	if strings.Contains(text, "No SDD artifacts found") {
+		t.Error("should NOT contain warning when artifacts exist")
 	}
 }

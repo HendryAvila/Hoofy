@@ -133,15 +133,10 @@ func (t *BusinessRulesTool) Handle(ctx context.Context, req mcp.CallToolRequest)
 		Glossary:    glossary,
 	}
 
-	content, err := t.renderer.Render(templates.BusinessRules, data)
+	// Render and write via shared function (ADR-001).
+	content, err := RenderAndWriteBusinessRules(projectRoot, t.renderer, data, false)
 	if err != nil {
-		return nil, fmt.Errorf("rendering business rules: %w", err)
-	}
-
-	// Write business rules file.
-	rulesPath := config.StagePath(projectRoot, config.StageBusinessRules)
-	if err := writeStageFile(rulesPath, content); err != nil {
-		return nil, fmt.Errorf("writing business rules: %w", err)
+		return nil, err
 	}
 
 	// Advance pipeline.

@@ -142,7 +142,7 @@ func TestIntegration_FullFixSmallFlow(t *testing.T) {
 }
 
 func TestIntegration_FeatureLargeWithADRs(t *testing.T) {
-	tmpDir, cleanup := setupChangeProject(t)
+	tmpDir, cleanup := setupChangeProjectWithArtifacts(t)
 	defer cleanup()
 
 	store := changes.NewFileStore()
@@ -302,7 +302,7 @@ func TestIntegration_ConcurrentChangeRejection(t *testing.T) {
 }
 
 func TestIntegration_RefactorMediumFlow(t *testing.T) {
-	tmpDir, cleanup := setupChangeProject(t)
+	tmpDir, cleanup := setupChangeProjectWithArtifacts(t)
 	defer cleanup()
 
 	store := changes.NewFileStore()

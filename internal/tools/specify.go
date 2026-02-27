@@ -158,15 +158,10 @@ func (t *SpecifyTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp
 		Dependencies:  dependencies,
 	}
 
-	content, err := t.renderer.Render(templates.Requirements, data)
+	// Render and write via shared function (ADR-001).
+	content, err := RenderAndWriteRequirements(projectRoot, t.renderer, data, false)
 	if err != nil {
-		return nil, fmt.Errorf("rendering requirements: %w", err)
-	}
-
-	// Write requirements file.
-	reqPath := config.StagePath(projectRoot, config.StageSpecify)
-	if err := writeStageFile(reqPath, content); err != nil {
-		return nil, fmt.Errorf("writing requirements: %w", err)
+		return nil, err
 	}
 
 	// Advance pipeline.

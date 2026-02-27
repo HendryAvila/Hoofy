@@ -1054,12 +1054,12 @@ const NODES = [
     title: 'What is Hoofy?',
     summary: 'Hoofy is an MCP server that gives AI agents two things they desperately lack: persistent memory and structured discipline. It prevents hallucinations by forcing specs before code and remembers context across sessions.',
     details: {
-      what: `<p>Hoofy is a <strong>single static binary</strong> (written in Go) that speaks the MCP (Model Context Protocol). It plugs into AI assistants like Claude, giving them 34 tools across three systems: Memory, Project Pipeline, and Change Pipeline.</p>
+      what: `<p>Hoofy is a <strong>single static binary</strong> (written in Go) that speaks the MCP (Model Context Protocol). It plugs into AI assistants like Claude, giving them 36 tools across four systems: Memory, Bootstrap, Project Pipeline, and Change Pipeline.</p>
 <p>Think of it as the difference between an AI with amnesia that starts fresh every conversation, and an AI that remembers your architecture decisions, knows your codebase conventions, and refuses to write code without understanding the requirements first.</p>`,
       how: `<pre><code># Install and run — zero dependencies
 hoofy serve
 
-# The AI uses 34 MCP tools automatically:
+# The AI uses 36 MCP tools automatically:
 mem_save, mem_search, mem_context,
 sdd_change, sdd_init_project, sdd_clarify...</code></pre>`,
       why: '<p>Research from <strong>METR 2025</strong> found that experienced developers were 19% <em>slower</em> with unstructured AI despite feeling 20% faster. Hoofy provides the structure that makes AI actually help.</p>'

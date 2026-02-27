@@ -40,16 +40,19 @@ Hoofy is three systems in one MCP server:
 | System | What it does | Tools |
 |---|---|---|
 | **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. Decisions, bugs, patterns, discoveries — your AI remembers what happened yesterday. | 19 `mem_*` tools |
-| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Now includes a **context-check** stage in every flow. | 5 `sdd_change*` + `sdd_adr` |
+| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Includes mandatory **context-check** and **artifact guard** stages. | 5 `sdd_change*` + `sdd_adr` |
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate and **business rules extraction** that blocks hallucinations. | 9 `sdd_*` tools |
+| **Bootstrap** | Reverse-engineer existing codebases into SDD artifacts. Scans project structure, configs, conventions, schemas, and tests — then generates requirements, business rules, and design docs. | `sdd_reverse_engineer` + `sdd_bootstrap` |
 
-One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode. **34 tools total.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode. **36 tools total.**
 
 ### Why Hoofy?
 
 AI coding assistants are powerful but forgetful and overconfident. Studies show experienced developers are [19% slower with unstructured AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) (METR 2025), and AI adoption without structure causes [7.2% delivery instability](https://dora.dev/research/2025/dora-report/) (DORA 2025). Hoofy fixes this by making your AI assistant remember context, follow specifications, and prove it understood before writing code.
 
 ### Key Features
+
+**Existing Project Bootstrap** — Got an existing codebase with no specs? `sdd_reverse_engineer` scans your project (directory structure, package manifests, configs, entry points, conventions, schemas, API definitions, ADRs, tests) and produces a structured report. Then `sdd_bootstrap` writes the missing SDD artifacts — requirements, business rules, and design docs — so the change pipeline works intelligently from day one. Medium/large changes are **blocked** without artifacts; small changes get a warning.
 
 **Knowledge Graph** — Memory observations aren't flat notes. You can connect them with typed, directional relations (`depends_on`, `caused_by`, `implements`, `supersedes`, `relates_to`, `part_of`) to build a navigable web of project knowledge. Use `mem_build_context` to traverse the graph from any observation and pull in related decisions, bugs, and patterns automatically.
 
@@ -81,6 +84,11 @@ flowchart TB
         P4 -->|Clear| P5[Design] --> P6[Tasks] --> P7[Validate]
     end
 
+    subgraph bootstrap ["Existing Project (no specs)"]
+        direction LR
+        B1["sdd_reverse_engineer\n(scan codebase)"] --> B2["AI analyzes\nreport"] --> B3["sdd_bootstrap\n(write artifacts)"]
+    end
+
     subgraph change ["Existing Project (changes)"]
         direction LR
         C1["sdd_change\n(type × size)"] --> C1b["Context\nCheck"]
@@ -98,16 +106,19 @@ flowchart TB
 
     explore -.->|"captures context before"| project
     explore -.->|"captures context before"| change
+    bootstrap -.->|"enables"| change
 
     style explore fill:#8b5cf6,stroke:#7c3aed,color:#fff
     style P4 fill:#f59e0b,stroke:#d97706,color:#000
     style P3b fill:#e879f9,stroke:#c026d3,color:#000
     style C1b fill:#e879f9,stroke:#c026d3,color:#000
+    style B1 fill:#06b6d4,stroke:#0891b2,color:#fff
+    style B3 fill:#06b6d4,stroke:#0891b2,color:#fff
     style P7 fill:#10b981,stroke:#059669,color:#fff
     style C5 fill:#10b981,stroke:#059669,color:#fff
 ```
 
-> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (34 tools)](docs/tool-reference.md)**
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (36 tools)](docs/tool-reference.md)**
 
 ---
 
@@ -157,7 +168,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
- > The **MCP server** is Hoofy itself — the binary you just installed. It provides 34 tools (memory, change pipeline, project pipeline) and works with **any** MCP-compatible AI tool.
+ > The **MCP server** is Hoofy itself — the binary you just installed. It provides 36 tools (memory, change pipeline, project pipeline, bootstrap) and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
 >
@@ -282,6 +293,7 @@ Hoofy already includes built-in server instructions, but adding a short block to
 
 Before coding any new feature or significant change, use Hoofy to create specs first.
 - New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
 - Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
 - Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
 Do NOT start coding without specs for any non-trivial change.
@@ -296,6 +308,7 @@ Do NOT start coding without specs for any non-trivial change.
 
 Before coding any new feature or significant change, use Hoofy to create specs first.
 - New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
 - Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
 - Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
 Do NOT start coding without specs for any non-trivial change.
@@ -310,6 +323,7 @@ Do NOT start coding without specs for any non-trivial change.
 
 Before coding any new feature or significant change, use Hoofy to create specs first.
 - New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
 - Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
 - Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
 Do NOT start coding without specs for any non-trivial change.
@@ -324,6 +338,7 @@ Do NOT start coding without specs for any non-trivial change.
 
 Before coding any new feature or significant change, use Hoofy to create specs first.
 - New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
 - Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
 - Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
 Do NOT start coding without specs for any non-trivial change.
@@ -338,6 +353,7 @@ Do NOT start coding without specs for any non-trivial change.
 
 Before coding any new feature or significant change, use Hoofy to create specs first.
 - New projects: use the SDD pipeline (sdd_init_project → sdd_validate)
+- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
 - Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
 - Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
 Do NOT start coding without specs for any non-trivial change.
@@ -361,7 +377,11 @@ The cheapest stages (context-check + describe + tasks + verify) take under 2 min
 
 Before jumping into a pipeline, use `sdd_explore` to capture context from your discussion — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory so the pipeline starts with clarity, not guesswork. Call it multiple times as your thinking evolves — it upserts, never duplicates.
 
-### 3. Right-size your changes
+### 3. Bootstrap existing projects
+
+Working on a project that never went through SDD? Don't skip specs — bootstrap them. Run `sdd_reverse_engineer` to scan the codebase, then `sdd_bootstrap` to generate the missing artifacts. This takes under a minute and means the change pipeline works with full context instead of flying blind. Medium/large changes are blocked without specs — and that's intentional.
+
+### 4. Right-size your changes
 
 Don't use a large pipeline for a one-line fix. Don't use a small pipeline for a new authentication system.
 
@@ -371,30 +391,30 @@ Don't use a large pipeline for a one-line fix. Don't use a small pipeline for a 
 | Needs requirements or design thought | **medium** (5 stages) |
 | Affects architecture, multiple systems | **large** (6-7 stages) |
 
-### 4. Let memory work for you
+### 5. Let memory work for you
 
 You don't need to tell the AI to use memory — Hoofy's built-in instructions handle it. But you'll get better results if you:
 - **Start sessions by greeting the AI** — it triggers `mem_context` to load recent history
 - **Mention past decisions** — "remember when we chose SQLite?" triggers `mem_search`
 - **Confirm session summaries** — the AI writes them at session end, review them for accuracy
 
-### 5. Connect knowledge with relations
+### 6. Connect knowledge with relations
 
 Hoofy's knowledge graph lets you connect related observations with typed, directional edges — turning flat memories into a navigable web. The AI creates relations automatically when it recognizes connections. You can also ask it to relate observations manually. Use `mem_build_context` to explore the full graph around any observation.
 
-### 6. Use topic keys for evolving knowledge
+### 7. Use topic keys for evolving knowledge
 
 When a decision might change (database schema, API design, architecture), use `topic_key` in `mem_save`. This **updates** the existing observation instead of creating duplicates. One observation per topic, always current.
 
-### 7. One change at a time
+### 8. One change at a time
 
 Hoofy enforces one active change at a time. This isn't a limitation — it's a feature. Scope creep happens when you try to do three things at once. Finish one change, verify it, then start the next.
 
-### 8. Trust the Clarity Gate
+### 9. Trust the Clarity Gate
 
 When the Clarity Gate asks questions, don't rush past them. Every question it asks represents an ambiguity that would have become a bug, a hallucination, or a "that's not what I meant" moment. Two minutes answering questions saves two hours debugging wrong implementations.
 
-### 9. Hoofy is the architect, Plan mode is the contractor
+### 10. Hoofy is the architect, Plan mode is the contractor
 
 If your AI tool has a plan/implementation mode, use it **after** Hoofy specs are done. Hoofy answers WHO and WHAT. Plan mode answers HOW.
 

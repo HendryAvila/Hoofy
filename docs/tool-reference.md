@@ -1,6 +1,6 @@
 # Tool Reference
 
-Hoofy exposes **34 MCP tools** across three systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
+Hoofy exposes **36 MCP tools** across four systems. The AI uses them proactively based on built-in server instructions — you don't need to call them manually.
 
 ---
 
@@ -42,6 +42,15 @@ Adaptive workflow for ongoing development. Includes `sdd_explore` for pre-pipeli
 | `sdd_change_advance` | Save stage content and advance to next stage |
 | `sdd_change_status` | View current change status, stage progress, and artifacts |
 | `sdd_adr` | Capture Architecture Decision Records (context, decision, rationale, rejected alternatives) |
+
+## Bootstrap (2 tools)
+
+Reverse-engineer existing codebases into SDD artifacts. Scan first, then bootstrap — no pipeline guards required.
+
+| Tool | Description |
+|---|---|
+| `sdd_reverse_engineer` | Scan an existing codebase and produce a structured evidence report (project overview, tech stack, architecture, conventions, data model, API, prior decisions, tests, business logic). Read-only — generates no files. Supports `detail_level`, `max_tokens`, `scan_path`, `max_depth` |
+| `sdd_bootstrap` | Write SDD artifacts (`requirements.md`, `business-rules.md`, `design.md`) from AI-generated content — no pipeline guards. Only generates missing artifacts. Auto-marks output with `⚡ Auto-generated` header for review |
 
 ## Project Pipeline (9 tools)
 

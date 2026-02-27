@@ -88,6 +88,20 @@ func (t *ChangeTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		)), nil
 	}
 
+	// Guard: check for SDD artifacts (context-aware changes).
+	// Medium/large changes are blocked without artifacts; small changes get a warning.
+	hasArtifacts := CheckSDDArtifacts(projectRoot)
+	if !hasArtifacts && (changeSize == changes.SizeMedium || changeSize == changes.SizeLarge) {
+		return mcp.NewToolResultError(
+			"❌ No SDD artifacts found in this project.\n\n" +
+				"Medium and large changes require project context for accurate " +
+				"architecture-aware suggestions.\n\n" +
+				"**Run `sdd_reverse_engineer` first** to scan your project and " +
+				"generate baseline SDD artifacts (`business-rules.md`, `design.md`, " +
+				"`requirements.md`). Then retry this change.",
+		), nil
+	}
+
 	// Look up stage flow.
 	flow, err := changes.StageFlow(changeType, changeSize)
 	if err != nil {
@@ -162,6 +176,14 @@ func (t *ChangeTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		len(flow), stageList.String(),
 		flow[0], flow[0],
 	)
+
+	// Append warning for small changes without SDD artifacts.
+	if !hasArtifacts {
+		response += "\n\n---\n\n" +
+			"⚠️ **No SDD artifacts found.** Consider running `sdd_reverse_engineer` to scan " +
+			"your project and generate baseline specs. The `context-check` stage will have " +
+			"limited context information without them."
+	}
 
 	return mcp.NewToolResultText(response), nil
 }

@@ -179,15 +179,10 @@ func (t *DesignTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		DesignDecisions:      designDecisions,
 	}
 
-	content, err := t.renderer.Render(templates.Design, data)
+	// Render and write via shared function (ADR-001).
+	content, err := RenderAndWriteDesign(projectRoot, t.renderer, data, false)
 	if err != nil {
-		return nil, fmt.Errorf("rendering design: %w", err)
-	}
-
-	// Write the design file.
-	designPath := config.StagePath(projectRoot, config.StageDesign)
-	if err := writeStageFile(designPath, content); err != nil {
-		return nil, fmt.Errorf("writing design: %w", err)
+		return nil, err
 	}
 
 	// Advance pipeline to next stage.
