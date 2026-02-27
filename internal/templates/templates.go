@@ -102,6 +102,7 @@ type DesignData struct {
 	Infrastructure       string
 	Security             string
 	DesignDecisions      string
+	QualityAnalysis      string
 }
 
 // TasksData holds the data for rendering an implementation task breakdown.

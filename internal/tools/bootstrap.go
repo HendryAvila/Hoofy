@@ -108,6 +108,11 @@ func (t *BootstrapTool) Definition() mcp.Tool {
 		mcp.WithString("design_decisions",
 			mcp.Description("Key architectural decisions and rationale (ADRs)."),
 		),
+		mcp.WithString("design_quality_analysis",
+			mcp.Description("Structural quality analysis: SOLID compliance, code smell detection "+
+				"(Shotgun Surgery, Feature Envy, God Class, Divergent Change, Inappropriate Intimacy), "+
+				"coupling & cohesion analysis, and mitigations."),
+		),
 		// --- Project name ---
 		mcp.WithString("project_name",
 			mcp.Description("Project name for the artifact headers. Defaults to the directory name."),
@@ -166,6 +171,7 @@ func (t *BootstrapTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*m
 	desInfra := req.GetString("design_infrastructure", "")
 	desSecurity := req.GetString("design_security", "")
 	desDecisions := req.GetString("design_decisions", "")
+	desQualityAnalysis := req.GetString("design_quality_analysis", "")
 
 	// Check if at least one artifact group has content.
 	hasReqContent := reqMustHave != "" || reqShouldHave != "" || reqNonFunctional != ""
@@ -289,6 +295,9 @@ func (t *BootstrapTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*m
 		if desDecisions == "" {
 			desDecisions = "_No explicit ADRs recorded._"
 		}
+		if desQualityAnalysis == "" {
+			desQualityAnalysis = "_No structural quality analysis provided._"
+		}
 
 		data := templates.DesignData{
 			Name:                 projectName,
@@ -300,6 +309,7 @@ func (t *BootstrapTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*m
 			Infrastructure:       desInfra,
 			Security:             desSecurity,
 			DesignDecisions:      desDecisions,
+			QualityAnalysis:      desQualityAnalysis,
 		}
 
 		if _, err := RenderAndWriteDesign(projectRoot, t.renderer, data, true); err != nil {

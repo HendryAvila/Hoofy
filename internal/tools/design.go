@@ -97,6 +97,22 @@ func (t *DesignTool) Definition() mcp.Tool {
 				"data is inherently relational\\n"+
 				"**Alternatives rejected**: MongoDB (no native joins, eventual consistency)'"),
 		),
+		mcp.WithString("quality_analysis",
+			mcp.Description("Structural quality analysis of the proposed design. "+
+				"Evaluate SOLID principles compliance and detect potential code smells. "+
+				"Include four subsections:\\n"+
+				"1. **SOLID Compliance**: For each component, assess SRP (single reason to change), "+
+				"OCP (extensible without modification), LSP (substitutable abstractions), "+
+				"ISP (specific interfaces), DIP (depends on abstractions).\\n"+
+				"2. **Potential Code Smells**: Detect Shotgun Surgery (change impacts many components), "+
+				"Feature Envy (component uses more data from others), God Class (too many responsibilities), "+
+				"Divergent Change (multiple reasons to change one component), "+
+				"Inappropriate Intimacy (components know too much about each other's internals).\\n"+
+				"3. **Coupling & Cohesion**: Analyze inter-component dependencies (afferent/efferent coupling) "+
+				"and internal cohesion of each component.\\n"+
+				"4. **Mitigations**: How the architecture prevents or mitigates each detected smell. "+
+				"Reference Martin Fowler's Refactoring catalog for smell definitions."),
+		),
 	)
 }
 
@@ -110,6 +126,7 @@ func (t *DesignTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	infrastructure := req.GetString("infrastructure", "")
 	security := req.GetString("security", "")
 	designDecisions := req.GetString("design_decisions", "")
+	qualityAnalysis := req.GetString("quality_analysis", "")
 
 	// Validate required fields.
 	if archOverview == "" {
@@ -165,6 +182,9 @@ func (t *DesignTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 	if designDecisions == "" {
 		designDecisions = "_No explicit ADRs recorded._"
 	}
+	if qualityAnalysis == "" {
+		qualityAnalysis = "_No structural quality analysis provided._"
+	}
 
 	// Build design document with REAL content from the AI.
 	data := templates.DesignData{
@@ -177,6 +197,7 @@ func (t *DesignTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mcp.
 		Infrastructure:       infrastructure,
 		Security:             security,
 		DesignDecisions:      designDecisions,
+		QualityAnalysis:      qualityAnalysis,
 	}
 
 	// Render and write via shared function (ADR-001).

@@ -402,14 +402,57 @@ SDD follows a sequential 8-stage pipeline:
 6. Call sdd_clarify WITH answers and your dimension_scores assessment
 7. If score < threshold, repeat from step 1
 
-### Stage 5: Design (Research: ADR format — Michael Nygard)
+### Stage 5: Design (Research: ADR format — Michael Nygard, SOLID — Robert C. Martin, Refactoring — Martin Fowler)
 1. Read ALL previous artifacts (use sdd_get_context for proposal, requirements,
    business-rules, clarifications)
 2. Design the technical architecture addressing ALL requirements AND business rules
 3. Choose tech stack with rationale, define components, data model, API contracts
 4. Document key architectural decisions as ADRs with: Context, Decision, Rationale,
    Alternatives Rejected (Michael Nygard format)
-5. Call sdd_create_design with the complete architecture document
+5. Perform a Structural Quality Analysis of the proposed design:
+
+   **SOLID Compliance** (Robert C. Martin — Clean Architecture):
+   For each component, evaluate:
+   - SRP: Does this component have exactly ONE reason to change?
+     Ask: "If requirement X changes, which components are affected?"
+     If the answer is more than 2 → Shotgun Surgery risk.
+   - OCP: Can this component be extended without modifying its source?
+     Look for: hardcoded conditionals, switch statements on types.
+   - LSP: Are abstractions truly substitutable?
+     Look for: type checks, casting, "special case" handling.
+   - ISP: Are interfaces specific to their consumers?
+     Look for: interfaces with 5+ methods, consumers using only 1-2 methods.
+   - DIP: Do components depend on abstractions or concretions?
+     Look for: direct struct instantiation vs interface injection.
+
+   **Code Smell Detection** (Martin Fowler — Refactoring, 2nd ed.):
+   Scan the component design for these structural smells:
+   - Shotgun Surgery: A single logical change requires modifications in many
+     components. Ask: "If I change the data model for X, how many files change?"
+   - Feature Envy: A component uses more data/methods from another component
+     than from itself. Symptom: excessive cross-component method calls.
+   - God Class: A component with too many responsibilities (covers 4+ requirements
+     OR has 5+ dependencies). Split into focused subcomponents.
+   - Divergent Change: A single component changes for multiple unrelated reasons.
+     Symptom: "we change this file for both auth AND billing changes."
+   - Inappropriate Intimacy: Two components know too much about each other's
+     internals. Symptom: accessing private fields, circular dependencies.
+
+   **Coupling & Cohesion**:
+   - Afferent coupling (Ca): How many components DEPEND ON this one?
+     High Ca = high impact on changes (be careful modifying it).
+   - Efferent coupling (Ce): How many components does this one DEPEND ON?
+     High Ce = fragile, breaks when dependencies change.
+   - Instability (I = Ce / (Ca + Ce)): 0 = maximally stable, 1 = maximally unstable.
+     Stable components should be abstract. Unstable ones can be concrete.
+   - Cohesion: Do all elements within a component serve its single responsibility?
+
+   **Mitigations**: For each detected smell or SOLID violation, document:
+   - What pattern or architectural choice prevents it
+   - If the smell is accepted as a trade-off, explain WHY
+
+6. Call sdd_create_design with the complete architecture document, including
+   the quality_analysis parameter
 
 ### Stage 6: Tasks
 1. Read the design document (use sdd_get_context stage=design)
@@ -430,7 +473,18 @@ SDD follows a sequential 8-stage pipeline:
 4. Check for inconsistencies between artifacts
 5. Verify business rules are reflected in design and tasks
 6. Assess risks and provide recommendations
-7. Call sdd_validate with the full analysis and verdict (PASS/PASS_WITH_WARNINGS/FAIL)
+7. Verify structural design quality against the task breakdown:
+   - For each requirement (FR-XXX), count how many components and tasks it touches.
+     If a single requirement change would require modifying 3+ tasks across
+     different components → flag as Shotgun Surgery risk.
+   - For each task, verify it maintains the SRP established in the design.
+     If a task modifies 3+ components → flag as potential coupling issue.
+   - Check if the tasks introduce dependencies not documented in the design's
+     coupling analysis. New dependencies = new risk.
+   - Verify that mitigations documented in the design's Quality Analysis section
+     are preserved in the task breakdown (smells are not re-introduced by tasks).
+8. Call sdd_validate with the full analysis, design_quality assessment, and
+   verdict (PASS/PASS_WITH_WARNINGS/FAIL)
 
 ## Modes
 - Guided: More questions, examples, encouragement. For non-technical users.
@@ -850,6 +904,35 @@ Good (specific, evidence-based, probing):
 - All flows end with verify — use it to validate the change
 - ADRs can be captured at any time during a change
 - Context-check is MANDATORY — never skip it, even for small changes
+
+### Structural Quality in Changes (ALL sizes — Robert C. Martin, Martin Fowler)
+
+Quality analysis is required for ALL change sizes, not just large ones.
+Code smells like Shotgun Surgery often emerge from small, seemingly harmless changes.
+
+**When the current stage is "design"** (medium/large changes):
+Include a Structural Quality Analysis section in the design content.
+Use the same SOLID + Code Smell + Coupling & Cohesion framework from Stage 5
+of the project pipeline. Even in a change context, analyze:
+- Which existing components does this change touch? If 3+ → Shotgun Surgery risk.
+- Does this change add a new dependency between components? Document it.
+- Does this change violate SRP of any existing component? Propose a split.
+- Does this change introduce Feature Envy (new code uses more data from
+  another component than its own)?
+
+**When the current stage is "verify"** (ALL sizes):
+Include a Design Quality section in the verification content.
+For small changes (no design stage), perform the quality analysis HERE:
+- Map the change description to affected components
+- Count how many components/files the change touches
+- For each task, ask: "If this requirement changes again, how many places break?"
+- Flag any detected smells with specific mitigation recommendations
+- If a smell is accepted as a trade-off, document WHY explicitly
+
+For medium/large changes (design stage exists), cross-check:
+- Verify the mitigations from the design's Quality Analysis are preserved in tasks
+- Check if the task breakdown introduces new coupling not documented in the design
+- Verify no God Class patterns emerge from combining multiple tasks into one component
 
 ### Wave Assignments in Tasks Stage
 When writing content for the **tasks** stage (both project pipeline and change pipeline),

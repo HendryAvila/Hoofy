@@ -282,6 +282,91 @@ func TestRender_Tasks_WithoutWaveAssignments(t *testing.T) {
 	}
 }
 
+// --- Render: Design ---
+
+func TestRender_Design_WithQualityAnalysis(t *testing.T) {
+	r, err := NewRenderer()
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+
+	data := DesignData{
+		Name:                 "Test Project",
+		ArchitectureOverview: "A modular monolith using Clean Architecture",
+		TechStack:            "- **Runtime**: Go 1.25",
+		Components:           "### AuthModule\n- Handles user auth",
+		APIContracts:         "POST /auth/login",
+		DataModel:            "### User\n| id | UUID |",
+		Infrastructure:       "Docker + Railway",
+		Security:             "JWT with refresh tokens",
+		DesignDecisions:      "### ADR-001: Go over Node.js",
+		QualityAnalysis:      "### SOLID Compliance\n- SRP: AuthModule has single responsibility\n\n### Potential Code Smells\n- No Shotgun Surgery detected\n\n### Coupling & Cohesion\n- Low coupling between modules\n\n### Mitigations\n- DIP via interface injection",
+	}
+
+	result, err := r.Render(Design, data)
+	if err != nil {
+		t.Fatalf("Render(Design) failed: %v", err)
+	}
+
+	checks := []string{
+		"# Test Project — Technical Design",
+		"## Architecture Overview",
+		"Clean Architecture",
+		"## Tech Stack",
+		"Go 1.25",
+		"## Components",
+		"AuthModule",
+		"## API Contracts",
+		"POST /auth/login",
+		"## Data Model",
+		"User",
+		"## Infrastructure & Deployment",
+		"Docker + Railway",
+		"## Security Considerations",
+		"JWT with refresh tokens",
+		"## Design Decisions",
+		"ADR-001",
+		"## Structural Quality Analysis",
+		"SOLID Compliance",
+		"Shotgun Surgery",
+		"Coupling & Cohesion",
+		"Mitigations",
+		"SDD-Hoffy", // Attribution link.
+	}
+
+	for _, check := range checks {
+		if !strings.Contains(result, check) {
+			t.Errorf("Design output missing: %q", check)
+		}
+	}
+}
+
+func TestRender_Design_WithoutQualityAnalysis(t *testing.T) {
+	r, err := NewRenderer()
+	if err != nil {
+		t.Fatalf("NewRenderer: %v", err)
+	}
+
+	// QualityAnalysis is empty — section header should still render.
+	data := DesignData{
+		Name:                 "Test Project",
+		ArchitectureOverview: "Microservices",
+		TechStack:            "Node.js",
+		Components:           "API Gateway",
+		DataModel:            "Users table",
+	}
+
+	result, err := r.Render(Design, data)
+	if err != nil {
+		t.Fatalf("Render(Design) failed: %v", err)
+	}
+
+	// Section header should still be present even with empty content.
+	if !strings.Contains(result, "## Structural Quality Analysis") {
+		t.Error("Design output should contain Structural Quality Analysis header even when empty")
+	}
+}
+
 // --- Renderer interface compliance ---
 
 func TestEmbedRenderer_ImplementsRenderer(t *testing.T) {

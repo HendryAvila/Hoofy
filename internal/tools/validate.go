@@ -86,6 +86,15 @@ func (t *ValidateTool) Definition() mcp.Tool {
 				"2. Add TASK for database migration strategy\\n"+
 				"3. Track NFR-003 (rate limiting) as tech debt for v1.1'"),
 		),
+		mcp.WithString("design_quality",
+			mcp.Description("Structural quality verification of the design. "+
+				"Cross-check the design's Structural Quality Analysis section against the task breakdown. "+
+				"Verify: (1) SOLID compliance — does each task maintain SRP? Does a single requirement "+
+				"change touch more than 2 components (Shotgun Surgery risk)? "+
+				"(2) Coupling — do tasks introduce new inter-component dependencies not documented in design? "+
+				"(3) Smell propagation — do the tasks mitigate or amplify the smells identified in the design? "+
+				"Reference Martin Fowler's Refactoring catalog for smell definitions."),
+		),
 	)
 }
 
@@ -97,6 +106,7 @@ func (t *ValidateTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	riskAssessment := req.GetString("risk_assessment", "")
 	verdict := req.GetString("verdict", "")
 	recommendations := req.GetString("recommendations", "")
+	designQuality := req.GetString("design_quality", "")
 
 	// Validate required fields.
 	if reqCoverage == "" {
@@ -164,6 +174,9 @@ func (t *ValidateTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	if recommendations == "" {
 		recommendations = "_No additional recommendations._"
 	}
+	if designQuality == "" {
+		designQuality = "_No structural quality verification provided._"
+	}
 
 	// Build the validation report.
 	var sb strings.Builder
@@ -179,6 +192,8 @@ func (t *ValidateTool) Handle(ctx context.Context, req mcp.CallToolRequest) (*mc
 	sb.WriteString(consistencyIssues)
 	sb.WriteString("\n\n## Risk Assessment\n\n")
 	sb.WriteString(riskAssessment)
+	sb.WriteString("\n\n## Design Quality\n\n")
+	sb.WriteString(designQuality)
 	sb.WriteString("\n\n## Recommendations\n\n")
 	sb.WriteString(recommendations)
 
