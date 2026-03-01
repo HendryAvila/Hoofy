@@ -174,6 +174,18 @@ func New() (*server.MCPServer, func(), error) {
 	statusPrompt := prompts.NewStatusPrompt()
 	s.AddPrompt(statusPrompt.Definition(), statusPrompt.Handle)
 
+	stageGuide := prompts.NewStageGuidePrompt()
+	s.AddPrompt(stageGuide.Definition(), stageGuide.Handle)
+
+	memoryGuide := prompts.NewMemoryGuidePrompt()
+	s.AddPrompt(memoryGuide.Definition(), memoryGuide.Handle)
+
+	changeGuide := prompts.NewChangeGuidePrompt()
+	s.AddPrompt(changeGuide.Definition(), changeGuide.Handle)
+
+	bootstrapGuide := prompts.NewBootstrapGuidePrompt()
+	s.AddPrompt(bootstrapGuide.Definition(), bootstrapGuide.Handle)
+
 	// --- Register resources ---
 
 	resourceHandler := resources.NewHandler(store)
@@ -256,6 +268,10 @@ func registerMemoryTools(s *server.MCPServer, ms *memory.Store) {
 
 // serverInstructions returns the system instructions that tell the AI
 // how to use Hoofy effectively.
+//
+// This is the "hot" layer — always loaded, ~160 lines. Detailed instructions
+// for specific workflows are served on-demand via MCP prompts (cold layer).
+// See: stage_guide.go, memory_guide.go, change_guide.go, bootstrap_guide.go
 func serverInstructions() string {
 	return `You have access to Hoofy, a Spec-Driven Development MCP server.
 
@@ -282,44 +298,14 @@ You do NOT need to activate Hoofy for:
 For bug fixes, refactors, enhancements, and small features, use the
 ADAPTIVE CHANGE PIPELINE instead (see below).
 
-## PRE-PIPELINE EXPLORATION
-
-Before starting any pipeline (project or change), use sdd_explore to capture
-the user's context, goals, and constraints. This ensures every subsequent
-stage is informed by structured pre-work rather than ad-hoc conversation.
-
-### When to Use sdd_explore
-- Before sdd_init_project: Capture project vision, user constraints, tech preferences
-- Before sdd_change: Capture change context, help determine type and size
-- During any open-ended discussion about features, architecture, or direction
-- When the user is "thinking out loud" and you want to preserve their reasoning
-
-### How to Use sdd_explore
-1. Discuss the idea with the user — ask clarifying questions
-2. Call sdd_explore with structured categories:
-   - goals: What they want to achieve
-   - constraints: Limitations (technical, business, time)
-   - preferences: Architecture, tech stack, patterns they prefer
-   - unknowns: Things they're unsure about
-   - decisions: Choices already made
-   - context: Any additional context
-3. The tool saves to memory with topic_key upsert — call it again as context evolves
-4. When ready, start the pipeline — retrieve explore context with mem_search(type=explore)
-   to inform your proposal/spec/design content
-5. The response includes type/size suggestions based on keywords — use these as hints
-
-### Important
-- sdd_explore is OPTIONAL — it never blocks pipeline advancement
-- It uses memory, not the pipeline state machine — no stage gates
-- Call it multiple times as the conversation evolves — it upserts, not duplicates
-- The type/size suggestion is a HINT — the user decides
-
 ## What is SDD?
+
 Spec-Driven Development reduces AI hallucinations by forcing clear specifications
 BEFORE writing code. Ambiguous requirements are the #1 cause of bad AI-generated code.
 (Source: IEEE 29148 — "well-formed requirements" prevent defects downstream)
 
 ## CRITICAL: How Tools Work
+
 Hoofy tools are STORAGE tools, not AI tools. They save content YOU generate.
 The workflow for each stage is:
 
@@ -332,6 +318,7 @@ NEVER call a tool with placeholder text like "TBD" or "to be defined".
 ALWAYS generate real, substantive content based on your conversation with the user.
 
 ## Pipeline
+
 SDD follows a sequential 8-stage pipeline:
 1. INIT — Set up the project (call sdd_init_project)
 2. PROPOSE — Create a structured proposal (YOU write it, tool saves it)
@@ -342,157 +329,20 @@ SDD follows a sequential 8-stage pipeline:
 7. TASKS — Atomic task breakdown with execution wave assignments
 8. VALIDATE — Cross-artifact consistency check (YOU analyze, tool saves report)
 
-## Stage-by-Stage Workflow
+Before starting any pipeline, use sdd_explore to capture the user's context,
+goals, and constraints. It's optional but strongly recommended.
 
-### Stage 1: Propose (Research: IREB Elicitation Techniques)
-1. Ask the user about their project idea
-2. Use IREB elicitation techniques — ask about CONTEXT, not just features:
-   - Instead of "What features do you want?" ask "What are the top 3 tasks
-     your primary user performs daily that this tool should improve?"
-   - Instead of "Who are the users?" ask "Describe someone who would use this
-     in their first week — what's their role, frustration, and goal?"
-3. Generate content for ALL sections:
-   - problem_statement: The core problem (2-3 sentences)
-   - target_users: 2-3 specific user personas with needs
-   - proposed_solution: High-level description (NO tech details)
-   - out_of_scope: 3-5 explicit exclusions
-   - success_criteria: 2-4 measurable outcomes
-   - open_questions: Remaining unknowns
-4. Call sdd_create_proposal with all sections filled in
-
-### Stage 2: Specify (Research: IEEE 29148 Quality Attributes)
-1. Read the proposal from sdd/proposal.md (use sdd_get_context if needed)
-2. Extract formal requirements using MoSCoW prioritization
-3. Each requirement gets a unique ID (FR-001 for functional, NFR-001 for non-functional)
-4. Apply IEEE 29148 quality attributes — each requirement MUST be:
-   - Necessary: traceable to a user need from the proposal
-   - Unambiguous: one interpretation only (no "etc.", "and/or", "appropriate")
-   - Verifiable: testable with a concrete condition
-   - Consistent: no contradictions with other requirements
-5. Call sdd_generate_requirements with real requirements content
-
-### Stage 3: Business Rules (Research: BRG Taxonomy, Business Rules Manifesto, DDD)
-1. Read the requirements (use sdd_get_context stage=requirements)
-2. For each requirement, ask: "Is there an implicit business rule here?"
-3. Extract rules into four categories (BRG taxonomy — Business Rules Group):
-   - Definitions: What do domain terms MEAN? Build a Ubiquitous Language
-     (DDD, Eric Evans — every term must have ONE precise meaning)
-   - Facts: What relationships between terms are ALWAYS true?
-   - Constraints: What behavior is NOT allowed? Use declarative format:
-     "When <condition> Then <imposition> [Otherwise <consequence>]"
-     (Business Rules Manifesto, Ronald Ross v2.0)
-   - Derivations: What knowledge is COMPUTED from other rules?
-4. Present the extracted rules to the user for validation
-5. Call sdd_create_business_rules with the validated content
-   Required params: definitions, facts, constraints
-   Optional params: derivations, glossary
-
-### Stage 4: Clarify — Clarity Gate (Research: EARS, Femmer et al. 2017)
-1. Call sdd_clarify WITHOUT answers to get the analysis framework
-2. Analyze the requirements AND business rules across all 8 dimensions
-3. Use EARS syntax patterns (Rolls-Royce) to test requirement completeness:
-   - Ubiquitous: "The <system> shall <action>" — always active
-   - State-driven: "While <state>, the <system> shall <action>"
-   - Event-driven: "When <trigger>, the <system> shall <action>"
-   - Optional: "Where <feature>, the <system> shall <action>"
-   - Unwanted: "If <condition>, then the <system> shall <action>"
-   If a requirement doesn't fit ANY pattern, it's likely ambiguous.
-4. Generate 3-5 specific questions targeting the weakest areas
-5. Present questions to the user and collect answers
-6. Call sdd_clarify WITH answers and your dimension_scores assessment
-7. If score < threshold, repeat from step 1
-
-### Stage 5: Design (Research: ADR format — Michael Nygard, SOLID — Robert C. Martin, Refactoring — Martin Fowler)
-1. Read ALL previous artifacts (use sdd_get_context for proposal, requirements,
-   business-rules, clarifications)
-2. Design the technical architecture addressing ALL requirements AND business rules
-3. Choose tech stack with rationale, define components, data model, API contracts
-4. Document key architectural decisions as ADRs with: Context, Decision, Rationale,
-   Alternatives Rejected (Michael Nygard format)
-5. Perform a Structural Quality Analysis of the proposed design:
-
-   **SOLID Compliance** (Robert C. Martin — Clean Architecture):
-   For each component, evaluate:
-   - SRP: Does this component have exactly ONE reason to change?
-     Ask: "If requirement X changes, which components are affected?"
-     If the answer is more than 2 → Shotgun Surgery risk.
-   - OCP: Can this component be extended without modifying its source?
-     Look for: hardcoded conditionals, switch statements on types.
-   - LSP: Are abstractions truly substitutable?
-     Look for: type checks, casting, "special case" handling.
-   - ISP: Are interfaces specific to their consumers?
-     Look for: interfaces with 5+ methods, consumers using only 1-2 methods.
-   - DIP: Do components depend on abstractions or concretions?
-     Look for: direct struct instantiation vs interface injection.
-
-   **Code Smell Detection** (Martin Fowler — Refactoring, 2nd ed.):
-   Scan the component design for these structural smells:
-   - Shotgun Surgery: A single logical change requires modifications in many
-     components. Ask: "If I change the data model for X, how many files change?"
-   - Feature Envy: A component uses more data/methods from another component
-     than from itself. Symptom: excessive cross-component method calls.
-   - God Class: A component with too many responsibilities (covers 4+ requirements
-     OR has 5+ dependencies). Split into focused subcomponents.
-   - Divergent Change: A single component changes for multiple unrelated reasons.
-     Symptom: "we change this file for both auth AND billing changes."
-   - Inappropriate Intimacy: Two components know too much about each other's
-     internals. Symptom: accessing private fields, circular dependencies.
-
-   **Coupling & Cohesion**:
-   - Afferent coupling (Ca): How many components DEPEND ON this one?
-     High Ca = high impact on changes (be careful modifying it).
-   - Efferent coupling (Ce): How many components does this one DEPEND ON?
-     High Ce = fragile, breaks when dependencies change.
-   - Instability (I = Ce / (Ca + Ce)): 0 = maximally stable, 1 = maximally unstable.
-     Stable components should be abstract. Unstable ones can be concrete.
-   - Cohesion: Do all elements within a component serve its single responsibility?
-
-   **Mitigations**: For each detected smell or SOLID violation, document:
-   - What pattern or architectural choice prevents it
-   - If the smell is accepted as a trade-off, explain WHY
-
-6. Call sdd_create_design with the complete architecture document, including
-   the quality_analysis parameter
-
-### Stage 6: Tasks
-1. Read the design document (use sdd_get_context stage=design)
-2. Break the design into atomic, AI-ready implementation tasks
-3. Each task must have: unique ID (TASK-001), clear scope, requirements covered,
-   component affected, dependencies, and acceptance criteria
-4. Define the dependency graph (what can be parallelized)
-5. Assign execution waves: group tasks into parallel waves based on dependencies.
-   Algorithm: tasks with no dependencies = Wave 1, tasks depending only on
-   Wave 1 = Wave 2, etc. Tasks within the same wave can execute in parallel.
-6. Call sdd_create_tasks with the complete task breakdown, including wave_assignments
-
-### Stage 7: Validate
-1. Read ALL artifacts (proposal, requirements, business-rules, clarifications,
-   design, tasks)
-2. Cross-reference every requirement against tasks (coverage analysis)
-3. Cross-reference every component against tasks (component coverage)
-4. Check for inconsistencies between artifacts
-5. Verify business rules are reflected in design and tasks
-6. Assess risks and provide recommendations
-7. Verify structural design quality against the task breakdown:
-   - For each requirement (FR-XXX), count how many components and tasks it touches.
-     If a single requirement change would require modifying 3+ tasks across
-     different components → flag as Shotgun Surgery risk.
-   - For each task, verify it maintains the SRP established in the design.
-     If a task modifies 3+ components → flag as potential coupling issue.
-   - Check if the tasks introduce dependencies not documented in the design's
-     coupling analysis. New dependencies = new risk.
-   - Verify that mitigations documented in the design's Quality Analysis section
-     are preserved in the task breakdown (smells are not re-introduced by tasks).
-8. Call sdd_validate with the full analysis, design_quality assessment, and
-   verdict (PASS/PASS_WITH_WARNINGS/FAIL)
+For stage-by-stage details, invoke the /sdd-stage-guide prompt.
 
 ## Modes
+
 - Guided: More questions, examples, encouragement. For non-technical users.
   Clarity threshold: 70/100.
 - Expert: Direct, concise, technical. For experienced developers.
   Clarity threshold: 50/100.
 
 ## Important Rules
+
 - NEVER skip the Clarity Gate
 - ALWAYS follow the pipeline order
 - NEVER pass placeholder text to tools — generate REAL content
@@ -522,9 +372,6 @@ Memory survives between conversations — use it to build project knowledge over
 **Where**: [files/paths affected, e.g. src/auth/middleware.ts]
 **Learned**: [gotchas, edge cases, or decisions — omit if none]
 
-### Title Guidelines
-Short and searchable: "JWT auth middleware", "Fixed N+1 in user list", "Switched from REST to gRPC"
-
 ### Type Categories
 Use the type parameter: decision, architecture, bugfix, pattern, config, discovery, learning
 
@@ -540,240 +387,9 @@ Use the type parameter: decision, architecture, bugfix, pattern, config, discove
 3. Call mem_session_summary with a structured summary (Goal/Instructions/Discoveries/Accomplished/Files)
 4. Call mem_session_end to close the session
 
-### Progress Tracking (mem_progress)
-Use mem_progress to persist a structured work-in-progress document that survives context compaction.
-Unlike session summaries (end-of-session), progress tracks WHERE YOU ARE mid-session.
-
-**Dual behavior**:
-- Read: mem_progress(project="X") — returns current progress (call at session start!)
-- Write: mem_progress(project="X", content=JSON) — upserts the progress doc
-
-**When to use**:
-- At session start: read progress to check for prior WIP
-- After completing significant work: update with current state
-- Before context compaction: save progress so the next window can continue
-
-**Content must be valid JSON.** Recommended structure:
-{"goal": "...", "completed": ["..."], "next_steps": ["..."], "blockers": ["..."]}
-
-One active progress per project — each write replaces the previous one.
-
-### Memory Compaction (mem_compact)
-Use mem_compact to identify and clean up stale observations that add noise to memory.
-Over time, memory accumulates old session notes, outdated discoveries, and superseded
-decisions. Compaction keeps memory lean and relevant.
-
-**Dual behavior**:
-- Identify: mem_compact(older_than_days=90) — lists stale candidates without deleting
-- Execute: mem_compact(older_than_days=90, compact_ids="[1,2,3]") — batch soft-deletes
-
-**Workflow** (two-step process):
-1. Call mem_compact WITHOUT compact_ids to review candidates
-2. Review the list — decide which observations are truly stale
-3. Optionally write a summary to preserve key knowledge
-4. Call mem_compact WITH compact_ids (and optional summary_title/summary_content)
-
-**When to suggest compaction**:
-- When mem_context returns many old, low-value observations
-- When a user complains about memory noise or irrelevant results
-- After a major milestone (v1 shipped, refactor complete) — clean up WIP notes
-- When observation count exceeds 200+ for a project
-
-**Summary observations**:
-When compacting, create a summary to preserve the essence of what was deleted:
-- summary_title: "Compacted 15 pre-v1 session notes"
-- summary_content: Key decisions and patterns extracted from the deleted observations
-- The summary is saved as type "compaction_summary" — searchable via mem_search
-
-### Topic Keys for Evolving Observations
-Use topic_key when an observation should UPDATE over time (not create duplicates):
-- Architecture decisions: "architecture/auth-model", "architecture/data-layer"
-- Project configuration: "config/deployment", "config/ci-cd"
-Use mem_suggest_topic_key to generate a normalized key from a title.
-
-### User Prompts
-Call mem_save_prompt to record what the user asked — their intent and goals.
-This helps future sessions understand context without the user repeating themselves.
-
-### Progressive Disclosure Pattern
-1. Start with mem_context for recent observations
-2. Use mem_search for specific topics
-3. Use mem_timeline to see chronological context around a search result
-4. Use mem_get_observation to read the full, untruncated content
-
-### Response Verbosity Control (detail_level parameter)
-Several read-heavy tools support a detail_level parameter that controls response size.
-Use this to manage context window budget — fetch the minimum detail needed first,
-then drill deeper only when necessary (Anthropic: "context is a finite resource").
-
-**Available levels**:
-- summary: Minimal tokens — IDs, titles, metadata only. Use for orientation and triage.
-- standard: Truncated content snippets. Good balance for most operations.
-- full: Complete untruncated content. Use only when you need to analyze details.
-
-**Default detail_level by tool**:
-- sdd_get_context: defaults to summary (minimal pipeline overview)
-- mem_context, mem_search, mem_timeline, sdd_context_check: default to standard
-
-**Tools that support detail_level**:
-- mem_context: Controls observation content in recent memory context
-- mem_search: Controls search result content (summary = titles only, full = complete content)
-- mem_timeline: Controls timeline entries (summary = titles only, full = all content untruncated)
-- sdd_context_check: Controls artifact excerpts and memory results in change reports
-- sdd_get_context: Controls pipeline artifact content (summary = stage status only, full = complete artifacts)
-
-**Navigation hints**:
-When results are capped by limit, tools append a "📊 Showing X of Y" footer.
-This tells you whether you're seeing everything or need to adjust limits.
-Tools with navigation hints: mem_search, mem_context, mem_timeline.
-
-**Progressive disclosure with detail_level**:
-1. Start with summary to scan what exists (minimal tokens)
-2. If something looks relevant, use standard for that specific tool call
-3. Only use full when you need the complete content for analysis
-
-Summary-mode responses include a footer hint reminding about the option to use
-standard or full for more detail.
-
-### Sub-Agent Memory Scoping (namespace parameter)
-
-When multiple AI sub-agents work in parallel (e.g., orchestrator spawns researcher, coder, reviewer),
-use the namespace parameter to isolate each sub-agent's memory observations.
-
-**What namespace does**:
-- Tags observations with a namespace string (e.g., "subagent/task-123", "agent/researcher")
-- Read tools filter by namespace when provided — each sub-agent sees only its own notes
-- Omitting namespace = no filter — the orchestrator sees EVERYTHING (by design)
-
-**Namespace vs scope**: These are orthogonal concepts:
-- scope = WHO sees it (project vs personal) — visibility level
-- namespace = WHICH AGENT owns it — isolation boundary
-
-**Tools that support namespace**:
-- Write: mem_save, mem_save_prompt, mem_session_summary, mem_progress
-- Read: mem_search, mem_context, mem_compact
-
-**Convention for namespace values**:
-- Sub-agents by task: "subagent/task-123", "subagent/research-auth"
-- Sub-agents by role: "agent/researcher", "agent/coder", "agent/reviewer"
-- Orchestrator: omit namespace entirely (sees all namespaces)
-
-**Typical multi-agent workflow**:
-1. Orchestrator spawns sub-agent with a task ID
-2. Sub-agent uses namespace="subagent/<task-id>" on all mem_save/mem_search calls
-3. Sub-agent's observations are isolated — no cross-contamination with other sub-agents
-4. Orchestrator reads without namespace to see all observations, then synthesizes
-5. Orchestrator saves final synthesis without namespace (shared knowledge)
-
-**mem_progress with namespace**: When namespace is provided, the topic_key becomes
-"progress/<namespace>/<project>" instead of "progress/<project>", giving each
-sub-agent its own progress document.
-
-**mem_timeline does NOT support namespace**: Timeline is inherently ID-scoped
-(centered on a specific observation_id), so namespace filtering is unnecessary.
-
-### Context Budget Awareness (max_tokens parameter)
-
-Five read-heavy tools accept an optional max_tokens integer parameter that caps response
-size by estimated token count. Use this when context window space is limited or when
-you need to fit a response within a specific token budget.
-
-**How it works**:
-- Token estimation uses len(text)/4 heuristic (fast O(1), no tokenizer dependency)
-- When max_tokens is set, the response is capped at approximately that many tokens
-- Every response from these tools includes a "📏 ~N tokens" footer showing estimated size
-- When a response is budget-capped, a "⚡ Budget-capped" notice is prepended to the footer
-
-**Tools that support max_tokens**:
-- mem_context: Incremental build — stops adding observations when budget would be exceeded
-- mem_search: Incremental build — stops adding results when budget would be exceeded
-- mem_timeline: Post-hoc truncation — builds full response, then truncates to budget
-- sdd_get_context: Post-hoc truncation — builds full response, then truncates to budget
-- sdd_context_check: Post-hoc truncation — builds full response, then truncates to budget
-
-**When to use max_tokens**:
-- When you know your remaining context window budget and want to stay within it
-- When fetching context for a sub-agent with a smaller context window
-- When you need a quick overview and want to cap verbosity beyond what detail_level provides
-
-**max_tokens vs detail_level**: These are complementary:
-- detail_level controls WHAT is included (summary vs standard vs full content)
-- max_tokens controls HOW MUCH total output, regardless of detail level
-- Use detail_level first to control content type, then max_tokens as a hard cap if needed
-
-### Knowledge Graph (Relations)
-
-Observations can be connected with typed, directional relations to form a knowledge graph.
-This transforms flat memories into a navigable web of connected decisions, patterns, and discoveries.
-
-**Creating relations** — use mem_relate after saving related observations:
-- mem_relate(from_id, to_id, relation_type) — creates a directional edge
-- Common types: relates_to, implements, depends_on, caused_by, supersedes, part_of
-- Use bidirectional=true when the relationship goes both ways
-- Add a note to explain WHY the observations are related
-
-**Traversing the graph** — use mem_build_context to explore connections:
-- mem_build_context(observation_id) — shows connected observations up to depth 2
-- mem_build_context(observation_id, depth=3) — goes deeper for more context
-- Use this when exploring a topic to understand its full web of related decisions
-
-**Removing relations** — use mem_unrelate(id) with the relation ID
-
-**When to create relations**:
-- After a bug fix, relate it to the decision that caused it (caused_by)
-- After implementing a feature, relate tasks to their requirements (implements)
-- When a new decision supersedes an old one (supersedes)
-- When observations are about the same topic (relates_to)
-- When one pattern depends on another (depends_on)
-
-## EXISTING PROJECTS — Reverse Engineering & Bootstrap
-
-When sdd_change is used on a project with NO existing SDD artifacts (no requirements.md,
-business-rules.md, or design.md in sdd/), the following behavior applies:
-
-- **Medium/Large changes are BLOCKED** with an error asking the user to run
-  sdd_reverse_engineer first
-- **Small changes proceed** but include a warning that specs are missing
-
-### Workflow for Existing Projects
-
-When you detect a project has no SDD artifacts (either from the sdd_change block message
-or by checking for sdd/ directory contents), follow this workflow:
-
-1. **Scan the project**: Call sdd_reverse_engineer to generate a comprehensive scan report
-   - Parameters: detail_level (summary/standard/full), max_tokens, scan_path, max_depth
-   - The tool is a READ-ONLY scanner — it does NOT modify any files
-   - Returns a structured Markdown report with 9 sections: Project Overview,
-     Directory Structure, Tech Stack Evidence, Architecture Evidence,
-     Conventions & Style, Data Model Evidence, API Evidence, Prior Decisions,
-     Test Evidence
-   - Also reports which SDD artifacts already exist (if any)
-
-2. **Analyze the report**: YOU analyze the scan results and generate content for the
-   missing SDD artifacts:
-   - **requirements.md**: Extract functional and non-functional requirements from what
-     the code already does (not aspirational — descriptive)
-   - **business-rules.md**: Extract domain terms, facts, constraints from the codebase
-   - **design.md**: Document the existing architecture, tech stack, components, data model
-
-3. **Write the artifacts**: Call sdd_bootstrap with the generated content
-   - The tool writes ONLY missing artifacts — existing ones are preserved
-   - All auto-generated artifacts include a header:
-     "> ⚡ Auto-generated by sdd_reverse_engineer — review and refine as needed"
-   - Parameters map to the same fields as sdd_generate_requirements,
-     sdd_create_business_rules, and sdd_create_design
-   - project_name: Optional — defaults to the directory name
-
-4. **User reviews**: Tell the user to review the generated artifacts and refine them
-   - The auto-generated header signals these are starting points, not final specs
-   - After review, the change pipeline (sdd_change) will work normally
-
-### Important Rules
-- sdd_reverse_engineer is ALWAYS read-only — it never writes files
-- sdd_bootstrap writes ONLY missing artifacts — never overwrites existing ones
-- Generated content should be DESCRIPTIVE (what the code does today), not ASPIRATIONAL
-- Always tell the user these are auto-generated starting points that need review
-- After bootstrap, sdd_change works normally (artifact guard passes)
+For full memory documentation (progress tracking, compaction, topic keys,
+namespace scoping, context budget, knowledge graph, progressive disclosure),
+invoke the /sdd-memory-guide prompt.
 
 ## ADAPTIVE CHANGE PIPELINE
 
@@ -786,7 +402,7 @@ adaptive change pipeline instead of the full 8-stage SDD pipeline.
 
 ### How It Works
 Each change has a TYPE and SIZE that determine the pipeline stages.
-ALL flows include a mandatory context-check stage (see below).
+ALL flows include a mandatory context-check stage.
 
 **Types**: feature, fix, refactor, enhancement
 **Sizes**: small (4 stages), medium (5 stages), large (6-7 stages)
@@ -813,70 +429,6 @@ ALL flows include a mandatory context-check stage (see below).
 - medium: propose → context-check → spec → tasks → verify
 - large: propose → context-check → spec → clarify → design → tasks → verify
 
-### Context-Check Stage (Research: IEEE 29148, Femmer et al. 2017, Bohner & Arnold)
-
-The context-check stage is a MANDATORY gate in every change flow. It prevents
-conflicts with existing specs, detects ambiguity early, and classifies impact.
-Even a small change can break a business rule — context-check catches that.
-
-When context-check is the current stage:
-
-1. Call sdd_context_check with the change description and optional project_name
-   - The tool SCANS filesystem and memory, returning a structured report
-   - It does NOT analyze — YOU analyze the report using the heuristics below
-
-2. Read the returned report — it contains:
-   - Existing SDD artifacts (proposals, requirements, business rules, design)
-   - Keyword-matched completed changes (max 10, ranked by relevance)
-   - Explore observations from memory (if available)
-   - Convention files (if no SDD artifacts exist — CLAUDE.md, AGENTS.md, etc.)
-
-3. Analyze for ambiguity using Requirements Smells (Femmer et al. 2017, IEEE 29148):
-   - Subjective language: "user-friendly", "fast", "easy", "intuitive", "simple"
-   - Ambiguous adverbs: "often", "sometimes", "usually", "typically", "mostly"
-   - Non-verifiable terms: "high quality", "good performance", "secure enough"
-   - Superlatives: "best", "fastest", "most efficient"
-   - Negative statements hiding requirements: "the system shall not..."
-   - Comparatives without baseline: "faster than", "better than", "more reliable"
-   - Totality terms: "all", "every", "always", "never" (are these truly universal?)
-
-4. Check for conflicts with existing specs and business rules:
-   - Does this change contradict any existing constraint or business rule?
-   - Does it modify behavior covered by existing requirements (FR-XXX)?
-   - Does it introduce terms not in the Ubiquitous Language glossary?
-   - Does it reference components or requirement IDs that don't exist?
-
-5. Classify impact (SemVer model — Bohner & Arnold, Software Change Impact Analysis):
-   - **Breaking**: changes existing behavior (existing tests would fail)
-   - **Non-breaking**: adds new behavior without affecting existing
-   - **Patch**: internal change, no behavior modification
-
-6. Generate the context-check.md content and call sdd_change_advance
-
-**If critical issues are found**:
-- Present them to the user with specific questions
-- Wait for answers before generating context-check.md
-- Include both questions and answers in the artifact
-
-**If no issues found**:
-- Generate a brief "all clear" documenting what was checked
-- Proceed to the next stage
-
-### Good vs Bad Questions (Research: IREB Elicitation Techniques)
-
-Bad (vague, answerable with yes/no):
-- "Is this change safe?" → too vague, no actionable answer
-- "Will this break anything?" → invites unverified "no"
-- "Are there any edge cases?" → too broad, produces hand-waving
-
-Good (specific, evidence-based, probing):
-- "FR-012 requires email notifications on status change. Your change modifies
-  the status enum — which notification templates need updating?"
-- "The business rule says 'orders over $500 require manager approval'. Your
-  change removes the approval step — is this rule being deprecated?"
-- "The existing design uses JWT with 15-min expiry. Your change adds a
-  'remember me' feature — what should the extended token lifetime be?"
-
 ### Change Pipeline Workflow
 
 1. **Create a change**: Call sdd_change with type, size, and description
@@ -889,13 +441,9 @@ Good (specific, evidence-based, probing):
    - It advances the state machine to the next stage
    - When the final stage (verify) is completed, the change is marked done
 
-3. **Check progress**: Call sdd_change_status to see the current state,
-   stage progress, artifact sizes, and ADRs
+3. **Check progress**: Call sdd_change_status to see the current state
 
-4. **Capture decisions**: Call sdd_adr at any time to record an
-   Architecture Decision Record (Michael Nygard format)
-   - With active change: saves ADR file + updates change record
-   - Without active change: saves to memory only (standalone ADR)
+4. **Capture decisions**: Call sdd_adr at any time to record an ADR
 
 ### Important Rules
 - Only ONE active change at a time
@@ -905,89 +453,28 @@ Good (specific, evidence-based, probing):
 - ADRs can be captured at any time during a change
 - Context-check is MANDATORY — never skip it, even for small changes
 
-### Structural Quality in Changes (ALL sizes — Robert C. Martin, Martin Fowler)
+For detailed change pipeline documentation (context-check heuristics,
+structural quality analysis, wave execution orchestration), invoke the
+/sdd-change-guide prompt.
 
-Quality analysis is required for ALL change sizes, not just large ones.
-Code smells like Shotgun Surgery often emerge from small, seemingly harmless changes.
+## EXISTING PROJECTS
 
-**When the current stage is "design"** (medium/large changes):
-Include a Structural Quality Analysis section in the design content.
-Use the same SOLID + Code Smell + Coupling & Cohesion framework from Stage 5
-of the project pipeline. Even in a change context, analyze:
-- Which existing components does this change touch? If 3+ → Shotgun Surgery risk.
-- Does this change add a new dependency between components? Document it.
-- Does this change violate SRP of any existing component? Propose a split.
-- Does this change introduce Feature Envy (new code uses more data from
-  another component than its own)?
+When sdd_change is used on a project with NO existing SDD artifacts,
+medium/large changes are BLOCKED until you bootstrap specs.
+Small changes proceed with a warning.
 
-**When the current stage is "verify"** (ALL sizes):
-Include a Design Quality section in the verification content.
-For small changes (no design stage), perform the quality analysis HERE:
-- Map the change description to affected components
-- Count how many components/files the change touches
-- For each task, ask: "If this requirement changes again, how many places break?"
-- Flag any detected smells with specific mitigation recommendations
-- If a smell is accepted as a trade-off, document WHY explicitly
+For the full bootstrap workflow (sdd_reverse_engineer + sdd_bootstrap),
+invoke the /sdd-bootstrap-guide prompt.
 
-For medium/large changes (design stage exists), cross-check:
-- Verify the mitigations from the design's Quality Analysis are preserved in tasks
-- Check if the task breakdown introduces new coupling not documented in the design
-- Verify no God Class patterns emerge from combining multiple tasks into one component
+## ON-DEMAND INSTRUCTION GUIDES
 
-### Wave Assignments in Tasks Stage
-When writing content for the **tasks** stage (both project pipeline and change pipeline),
-include execution wave assignments to enable parallel execution:
-- Group tasks into waves based on dependencies
-- Wave 1: tasks with no dependencies (can all run in parallel)
-- Wave 2: tasks that depend only on Wave 1 tasks (can run in parallel with each other)
-- Continue for Wave 3, 4, etc.
-- Format as a clear section in the tasks content (e.g., "## Execution Waves")
-- For the project pipeline, use the wave_assignments parameter in sdd_create_tasks
+The following prompts provide detailed instructions for specific workflows.
+Invoke them when you need the full reference:
 
-### Wave Execution — Multi-Agent Orchestration
-When the user asks you to IMPLEMENT tasks that have wave assignments, use this strategy
-to execute them efficiently. Adapt based on your available capabilities:
-
-**Step 1 — Detect your orchestration tier:**
-- **Tier 1 (Agent Teams)**: You can create a team of independent agents with a shared task list,
-  inter-agent communication, and dependency-aware task claiming. Agents coordinate among themselves.
-- **Tier 2 (Sub-Agents)**: You can launch parallel worker agents that execute independently and
-  report results back to you (the caller). Workers cannot communicate with each other.
-- **Tier 3 (Sequential)**: You have no parallelization capability. You execute tasks one by one.
-
-If you are unsure which tier you support, ASK THE USER before proceeding.
-
-**Step 2 — Execute by tier:**
-
-Tier 1 (Agent Teams):
-1. Create a team with enough agents to cover the largest wave
-2. Map each TASK from the wave assignments to a task in the shared task list
-3. Set task dependencies matching the dependency graph — blocked tasks auto-unblock when dependencies complete
-4. Let agents self-claim and execute tasks. Wave boundaries are enforced by the dependency graph itself.
-5. Each agent should use the namespace parameter on memory tools (e.g., namespace="agent/<task-id>")
-   to isolate its observations. The orchestrator reads without namespace to see all progress.
-6. Use mem_progress to track overall wave completion state
-
-Tier 2 (Sub-Agents):
-1. Start with Wave 1 — launch one sub-agent per task in the wave, all in parallel
-2. Wait for ALL sub-agents in the wave to complete before starting the next wave
-3. NEVER start Wave N+1 until every task in Wave N has succeeded
-4. Each sub-agent should use namespace="subagent/<task-id>" on memory tools for isolation
-5. After each wave, check results and update mem_progress before launching the next wave
-6. If a sub-agent fails, stop and report — do not continue to the next wave
-
-Tier 3 (Sequential):
-1. Execute tasks in dependency graph order (not wave order — follow the actual dependencies)
-2. Complete each task fully before starting the next
-3. Use mem_progress to checkpoint after each task completion
-4. If a task fails, stop and report
-
-**Step 3 — Prevent file conflicts:**
-Tasks within the same wave MUST NOT modify the same files. If the task breakdown has
-overlapping file ownership in the same wave, flag this to the user before executing.
-This applies to Tier 1 and Tier 2 only (Tier 3 is sequential, so no conflicts).
-
-**Step 4 — Report completion:**
-After all waves complete, provide a summary: which tasks succeeded, which failed,
-total time if available, and any issues encountered during execution.`
+| Prompt | When to Invoke |
+|--------|---------------|
+| /sdd-stage-guide | Working on any pipeline stage (Propose through Validate) |
+| /sdd-memory-guide | Using advanced memory features (compaction, namespaces, graph, budget) |
+| /sdd-change-guide | Working on context-check, structural quality, or wave execution |
+| /sdd-bootstrap-guide | Bootstrapping an existing project into SDD |`
 }
