@@ -27,7 +27,7 @@ func (p *StartPrompt) Definition() mcp.Prompt {
 		mcp.WithPromptDescription(
 			"Start a new Spec-Driven Development project. "+
 				"This will guide you through initializing the SDD pipeline, "+
-				"from setting up the project to creating your first proposal.",
+				"from setting up the project to defining your principles and charter.",
 		),
 		mcp.WithArgument("project_name",
 			mcp.ArgumentDescription("Name of your project"),
@@ -72,9 +72,11 @@ func (p *StartPrompt) Handle(ctx context.Context, req mcp.GetPromptRequest) (*mc
 					"I want to start a new Spec-Driven Development project called '%s' in %s mode.\n\n"+
 						"Please:\n"+
 						"1. Run `sdd_init_project` with name='%s', description (ask me for a brief description), and mode='%s'\n"+
-						"2. After init, ask me to describe my project idea\n"+
-						"3. Once I describe my idea, run `sdd_create_proposal` with my idea\n"+
-						"4. Guide me through the rest of the SDD pipeline step by step\n\n"+
+						"2. After init, ask me about the core principles and invariants of my project\n"+
+						"3. Once I describe them, run `sdd_create_principles` with my principles\n"+
+						"4. Then ask me to describe my project idea for the charter\n"+
+						"5. Once I describe my idea, run `sdd_create_charter` with my idea\n"+
+						"6. Guide me through the rest of the SDD pipeline step by step\n\n"+
 						"%s",
 					projectName, mode, projectName, mode, modeExplanation,
 				)),

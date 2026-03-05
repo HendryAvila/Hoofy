@@ -56,7 +56,7 @@ When context-check is the current stage:
    - It does NOT analyze — YOU analyze the report using the heuristics below
 
 2. Read the returned report — it contains:
-   - Existing SDD artifacts (proposals, requirements, business rules, design)
+   - Existing SDD artifacts (charters, requirements, business rules, design)
    - Keyword-matched completed changes (max 10, ranked by relevance)
    - Explore observations from memory (if available)
    - Convention files (if no SDD artifacts exist — CLAUDE.md, AGENTS.md, etc.)

@@ -54,11 +54,14 @@ func New() (*server.MCPServer, func(), error) {
 
 	// --- Register SDD tools ---
 
-	initTool := tools.NewInitTool(store)
+	initTool := tools.NewInitTool(store, renderer)
 	s.AddTool(initTool.Definition(), initTool.Handle)
 
-	proposeTool := tools.NewProposeTool(store, renderer)
-	s.AddTool(proposeTool.Definition(), proposeTool.Handle)
+	principlesTool := tools.NewPrinciplesTool(store, renderer)
+	s.AddTool(principlesTool.Definition(), principlesTool.Handle)
+
+	charterTool := tools.NewCharterTool(store, renderer)
+	s.AddTool(charterTool.Definition(), charterTool.Handle)
 
 	specifyTool := tools.NewSpecifyTool(store, renderer)
 	s.AddTool(specifyTool.Definition(), specifyTool.Handle)
@@ -83,7 +86,7 @@ func New() (*server.MCPServer, func(), error) {
 
 	// --- Register bootstrap & reverse-engineer tools ---
 	//
-	// These tools work without sdd.json or an active pipeline.
+	// These tools work without hoofy.json or an active pipeline.
 	// sdd_reverse_engineer is a read-only scanner (no dependencies).
 	// sdd_bootstrap writes artifacts using shared rendering functions.
 
@@ -93,11 +96,14 @@ func New() (*server.MCPServer, func(), error) {
 	bootstrapTool := tools.NewBootstrapTool(renderer)
 	s.AddTool(bootstrapTool.Definition(), bootstrapTool.Handle)
 
+	auditTool := tools.NewAuditTool()
+	s.AddTool(auditTool.Definition(), auditTool.Handle)
+
 	// --- Register change pipeline tools ---
 	//
 	// The change pipeline is independent from the project pipeline —
-	// it works without sdd.json. It uses its own FileStore for
-	// persistence under sdd/changes/.
+	// it works without hoofy.json. It uses its own FileStore for
+	// persistence under docs/changes/.
 
 	changeStore := changes.NewFileStore()
 
@@ -129,7 +135,7 @@ func New() (*server.MCPServer, func(), error) {
 	s.AddTool(contextCheckTool.Definition(), contextCheckTool.Handle)
 
 	// Suggest-context tool registered unconditionally — standalone tool
-	// for ad-hoc sessions, works without active change or sdd.json.
+	// for ad-hoc sessions, works without active change or hoofy.json.
 	suggestContextTool := tools.NewSuggestContextTool(changeStore, memStore)
 	s.AddTool(suggestContextTool.Definition(), suggestContextTool.Handle)
 
@@ -154,7 +160,8 @@ func New() (*server.MCPServer, func(), error) {
 		// cross-session awareness of pipeline state. The bridge is nil-safe:
 		// if memory init failed, tools work normally without it.
 		bridge := tools.NewMemoryBridge(memStore)
-		proposeTool.SetBridge(bridge)
+		principlesTool.SetBridge(bridge)
+		charterTool.SetBridge(bridge)
 		specifyTool.SetBridge(bridge)
 		businessRulesTool.SetBridge(bridge)
 		clarifyTool.SetBridge(bridge)
@@ -310,11 +317,15 @@ ADAPTIVE CHANGE PIPELINE instead (see below).
 
 For ad-hoc sessions (quick tasks, exploration, debugging), call sdd_suggest_context
 with a task description to get relevant specs, memory, and changes to read first.
-It works without a pipeline or sdd.json.
+It works without a pipeline or hoofy.json.
 
 For code review, call sdd_review with a change description to generate a spec-aware
 review checklist. Each item references specific spec IDs (FR-XXX, BRC-XXX, ADRs).
-It works without a pipeline or sdd.json.
+It works without a pipeline or hoofy.json.
+
+For spec compliance auditing, call sdd_audit to compare specs/requirements against
+actual source code. It scans the codebase and reports discrepancies (unimplemented
+requirements, undocumented features, stale specs). It works without a pipeline or hoofy.json.
 
 ## What is SDD?
 
@@ -337,15 +348,16 @@ ALWAYS generate real, substantive content based on your conversation with the us
 
 ## Pipeline
 
-SDD follows a sequential 8-stage pipeline:
+SDD follows a sequential 9-stage pipeline:
 1. INIT — Set up the project (call sdd_init_project)
-2. PROPOSE — Create a structured proposal (YOU write it, tool saves it)
-3. SPECIFY — Extract formal requirements with IEEE 29148 quality attributes
-4. BUSINESS RULES — Extract declarative business rules using BRG taxonomy
-5. CLARIFY — The Clarity Gate: resolve ambiguities using EARS patterns
-6. DESIGN — Technical architecture document with ADRs (Michael Nygard format)
-7. TASKS — Atomic task breakdown with execution wave assignments
-8. VALIDATE — Cross-artifact consistency check (YOU analyze, tool saves report)
+2. PRINCIPLES — Define golden invariants and core beliefs (call sdd_create_principles)
+3. CHARTER — Create a structured charter (YOU write it, tool saves it)
+4. SPECIFY — Extract formal requirements with IEEE 29148 quality attributes
+5. BUSINESS RULES — Extract declarative business rules using BRG taxonomy
+6. CLARIFY — The Clarity Gate: resolve ambiguities using EARS patterns
+7. DESIGN — Technical architecture document with ADRs (Michael Nygard format)
+8. TASKS — Atomic task breakdown with execution wave assignments
+9. VALIDATE — Cross-artifact consistency check (YOU analyze, tool saves report)
 
 Before starting any pipeline, use sdd_explore to capture the user's context,
 goals, and constraints. It's optional but strongly recommended.
@@ -412,7 +424,7 @@ invoke the /sdd-memory-guide prompt.
 ## ADAPTIVE CHANGE PIPELINE
 
 For ongoing development (features, fixes, refactors, enhancements), use the
-adaptive change pipeline instead of the full 8-stage SDD pipeline.
+adaptive change pipeline instead of the full 9-stage SDD pipeline.
 
 ### When to Use Changes vs Full Pipeline
 - **Full pipeline** (sdd_init_project): Brand new projects from scratch
@@ -434,8 +446,8 @@ ALL flows include a mandatory context-check stage.
 
 **Feature**:
 - small: describe → context-check → tasks → verify
-- medium: propose → context-check → spec → tasks → verify
-- large: propose → context-check → spec → clarify → design → tasks → verify
+- medium: charter → context-check → spec → tasks → verify
+- large: charter → context-check → spec → clarify → design → tasks → verify
 
 **Refactor**:
 - small: scope → context-check → tasks → verify
@@ -444,14 +456,14 @@ ALL flows include a mandatory context-check stage.
 
 **Enhancement**:
 - small: describe → context-check → tasks → verify
-- medium: propose → context-check → spec → tasks → verify
-- large: propose → context-check → spec → clarify → design → tasks → verify
+- medium: charter → context-check → spec → tasks → verify
+- large: charter → context-check → spec → clarify → design → tasks → verify
 
 ### Change Pipeline Workflow
 
 1. **Create a change**: Call sdd_change with type, size, and description
    - Only ONE active change at a time
-   - The tool creates a directory at sdd/changes/<slug>/
+   - The tool creates a directory at docs/changes/<slug>/
 
 2. **Work through stages**: For each stage, generate content and call
    sdd_change_advance with the content
@@ -491,7 +503,7 @@ Invoke them when you need the full reference:
 
 | Prompt | When to Invoke |
 |--------|---------------|
-| /sdd-stage-guide | Working on any pipeline stage (Propose through Validate) |
+| /sdd-stage-guide | Working on any pipeline stage (Principles through Validate) |
 | /sdd-memory-guide | Using advanced memory features (compaction, namespaces, graph, budget) |
 | /sdd-change-guide | Working on context-check, structural quality, or wave execution |
 | /sdd-bootstrap-guide | Bootstrapping an existing project into SDD |`

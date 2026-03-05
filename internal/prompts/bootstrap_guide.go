@@ -45,7 +45,7 @@ const bootstrapGuideContent = `# SDD Bootstrap Guide for Existing Projects
 ## When This Applies
 
 When sdd_change is used on a project with NO existing SDD artifacts (no requirements.md,
-business-rules.md, or design.md in sdd/), the following behavior applies:
+business-rules.md, or design.md in docs/), the following behavior applies:
 
 - **Medium/Large changes are BLOCKED** with an error asking the user to run
   sdd_reverse_engineer first
@@ -54,7 +54,7 @@ business-rules.md, or design.md in sdd/), the following behavior applies:
 ## Workflow for Existing Projects
 
 When you detect a project has no SDD artifacts (either from the sdd_change block message
-or by checking for sdd/ directory contents), follow this workflow:
+or by checking for docs/ directory contents), follow this workflow:
 
 1. **Scan the project**: Call sdd_reverse_engineer to generate a comprehensive scan report
    - Parameters: detail_level (summary/standard/full), max_tokens, scan_path, max_depth

@@ -23,11 +23,11 @@ func (p *StageGuidePrompt) Definition() mcp.Prompt {
 		mcp.WithPromptDescription(
 			"Detailed stage-by-stage workflow for the SDD pipeline. "+
 				"Includes research references (IEEE 29148, BRG, EARS, SOLID, Fowler) "+
-				"and instructions for each stage from Propose through Validate.",
+				"and instructions for each stage from Principles through Validate.",
 		),
 		mcp.WithArgument("stage",
 			mcp.ArgumentDescription(
-				"Optional: focus on a specific stage (propose, specify, business-rules, clarify, design, tasks, validate, explore)",
+				"Optional: focus on a specific stage (principles, charter, specify, business-rules, clarify, design, tasks, validate, explore)",
 			),
 		),
 	)
@@ -78,7 +78,7 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
    - context: Any additional context
 3. The tool saves to memory with topic_key upsert — call it again as context evolves
 4. When ready, start the pipeline — retrieve explore context with mem_search(type=explore)
-   to inform your proposal/spec/design content
+   to inform your charter/spec/design content
 5. The response includes type/size suggestions based on keywords — use these as hints
 
 ### Important
@@ -87,7 +87,20 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
 - Call it multiple times as the conversation evolves — it upserts, not duplicates
 - The type/size suggestion is a HINT — the user decides
 
-## Stage 1: Propose (Research: IREB Elicitation Techniques)
+## Stage 1: Principles
+
+1. Ask the user about their project's core beliefs and golden invariants
+2. These are the non-negotiable truths that should NEVER be violated:
+   - Architecture principles (e.g., "All persistence goes through repositories")
+   - Coding standards (e.g., "No any types in TypeScript")
+   - Domain truths (e.g., "An order cannot exist without a customer")
+3. Generate content for these sections:
+   - principles: Golden invariants — things that must ALWAYS be true (required)
+   - coding_standards: Code-level rules and conventions (optional)
+   - domain_truths: Business invariants that the system must enforce (optional)
+4. Call sdd_create_principles with the content
+
+## Stage 2: Charter (Research: IREB Elicitation Techniques)
 
 1. Ask the user about their project idea
 2. Use IREB elicitation techniques — ask about CONTEXT, not just features:
@@ -102,21 +115,21 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
    - out_of_scope: 3-5 explicit exclusions
    - success_criteria: 2-4 measurable outcomes
    - open_questions: Remaining unknowns
-4. Call sdd_create_proposal with all sections filled in
+4. Call sdd_create_charter with all sections filled in
 
-## Stage 2: Specify (Research: IEEE 29148 Quality Attributes)
+## Stage 3: Specify (Research: IEEE 29148 Quality Attributes)
 
-1. Read the proposal from sdd/proposal.md (use sdd_get_context if needed)
+1. Read the charter from docs/charter.md (use sdd_get_context if needed)
 2. Extract formal requirements using MoSCoW prioritization
 3. Each requirement gets a unique ID (FR-001 for functional, NFR-001 for non-functional)
 4. Apply IEEE 29148 quality attributes — each requirement MUST be:
-   - Necessary: traceable to a user need from the proposal
+   - Necessary: traceable to a user need from the charter
    - Unambiguous: one interpretation only (no "etc.", "and/or", "appropriate")
    - Verifiable: testable with a concrete condition
    - Consistent: no contradictions with other requirements
 5. Call sdd_generate_requirements with real requirements content
 
-## Stage 3: Business Rules (Research: BRG Taxonomy, Business Rules Manifesto, DDD)
+## Stage 4: Business Rules (Research: BRG Taxonomy, Business Rules Manifesto, DDD)
 
 1. Read the requirements (use sdd_get_context stage=requirements)
 2. For each requirement, ask: "Is there an implicit business rule here?"
@@ -133,7 +146,7 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
    Required params: definitions, facts, constraints
    Optional params: derivations, glossary
 
-## Stage 4: Clarify — Clarity Gate (Research: EARS, Femmer et al. 2017)
+## Stage 5: Clarify — Clarity Gate (Research: EARS, Femmer et al. 2017)
 
 1. Call sdd_clarify WITHOUT answers to get the analysis framework
 2. Analyze the requirements AND business rules across all 8 dimensions
@@ -149,14 +162,15 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
 6. Call sdd_clarify WITH answers and your dimension_scores assessment
 7. If score < threshold, repeat from step 1
 
-## Stage 5: Design (Research: ADR format — Michael Nygard, SOLID — Robert C. Martin, Refactoring — Martin Fowler)
+## Stage 6: Design (Research: ADR format — Michael Nygard, SOLID — Robert C. Martin, Refactoring — Martin Fowler)
 
-1. Read ALL previous artifacts (use sdd_get_context for proposal, requirements,
+1. Read ALL previous artifacts (use sdd_get_context for charter, requirements,
    business-rules, clarifications)
 2. Design the technical architecture addressing ALL requirements AND business rules
 3. Choose tech stack with rationale, define components, data model, API contracts
-4. Document key architectural decisions as ADRs with: Context, Decision, Rationale,
-   Alternatives Rejected (Michael Nygard format)
+4. Record key architectural decisions as ADRs by calling sdd_adr for each decision.
+   Use Michael Nygard format: Context, Decision, Rationale, Alternatives Rejected.
+   ADRs are stored as individual files in docs/adrs/.
 5. Perform a Structural Quality Analysis of the proposed design:
 
    **SOLID Compliance** (Robert C. Martin — Clean Architecture):
@@ -202,7 +216,7 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
 6. Call sdd_create_design with the complete architecture document, including
    the quality_analysis parameter
 
-## Stage 6: Tasks
+## Stage 7: Tasks
 
 1. Read the design document (use sdd_get_context stage=design)
 2. Break the design into atomic, AI-ready implementation tasks
@@ -214,9 +228,9 @@ stage is informed by structured pre-work rather than ad-hoc conversation.
    Wave 1 = Wave 2, etc. Tasks within the same wave can execute in parallel.
 6. Call sdd_create_tasks with the complete task breakdown, including wave_assignments
 
-## Stage 7: Validate
+## Stage 8: Validate
 
-1. Read ALL artifacts (proposal, requirements, business-rules, clarifications,
+1. Read ALL artifacts (charter, requirements, business-rules, clarifications,
    design, tasks)
 2. Cross-reference every requirement against tasks (coverage analysis)
 3. Cross-reference every component against tasks (component coverage)
