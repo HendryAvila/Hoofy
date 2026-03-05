@@ -572,8 +572,8 @@ func TestNextADRNumber_EmptyDir(t *testing.T) {
 
 func TestNextADRNumber_WithExisting(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(dir, "002-second.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "002-second.md"), []byte(""), 0o644)
 
 	if got := nextADRNumber(dir); got != 3 {
 		t.Errorf("nextADRNumber = %d, want 3", got)
@@ -582,8 +582,8 @@ func TestNextADRNumber_WithExisting(t *testing.T) {
 
 func TestNextADRNumber_NonSequential(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(dir, "005-jumped.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "005-jumped.md"), []byte(""), 0o644)
 
 	if got := nextADRNumber(dir); got != 6 {
 		t.Errorf("nextADRNumber = %d, want 6", got)
@@ -592,8 +592,8 @@ func TestNextADRNumber_NonSequential(t *testing.T) {
 
 func TestNextADRNumber_IgnoresNonMatching(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "README.md"), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "README.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
 
 	if got := nextADRNumber(dir); got != 2 {
 		t.Errorf("nextADRNumber = %d, want 2", got)
@@ -623,9 +623,9 @@ func TestSlugifyTitle(t *testing.T) {
 
 func TestListADRFiles(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "002-second.md"), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
-	os.WriteFile(filepath.Join(dir, "README.txt"), []byte(""), 0o644) // not .md
+	_ = os.WriteFile(filepath.Join(dir, "002-second.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "001-first.md"), []byte(""), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "README.txt"), []byte(""), 0o644) // not .md
 
 	files := listADRFiles(dir)
 	if len(files) != 2 {

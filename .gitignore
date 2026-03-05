@@ -34,3 +34,6 @@ AGENTS.md
 
 # Publicidad y marketing (contenido personal)
 publicidad/
+
+# Legacy SDD artifacts (pre-v1.0, now at docs/)
+sdd/

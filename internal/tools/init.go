@@ -192,7 +192,7 @@ func (t *InitTool) writeAgentInstructions(projectRoot, projectName, docsDir stri
 		if err != nil {
 			return "", "", fmt.Errorf("opening %s for append: %w", filepath.Base(targetPath), err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		if _, err := f.WriteString("\n" + content); err != nil {
 			return "", "", fmt.Errorf("appending to %s: %w", filepath.Base(targetPath), err)
 		}

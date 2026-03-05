@@ -231,7 +231,7 @@ func (fs *FileStore) Load(projectRoot string) (*ProjectConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("Hoofy project not initialized — run sdd_init_project first")
+			return nil, fmt.Errorf("hoofy project not initialized — run sdd_init_project first")
 		}
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
