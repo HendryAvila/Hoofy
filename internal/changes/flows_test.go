@@ -42,13 +42,13 @@ func TestStageFlow(t *testing.T) {
 			name:     "feature/medium",
 			cType:    TypeFeature,
 			cSize:    SizeMedium,
-			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageCharter, StageContextCheck, StageSpec, StageTasks, StageVerify},
 		},
 		{
 			name:     "feature/large",
 			cType:    TypeFeature,
 			cSize:    SizeLarge,
-			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageCharter, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 		},
 		// --- Refactor flows (all include context-check at index 1) ---
 		{
@@ -80,13 +80,13 @@ func TestStageFlow(t *testing.T) {
 			name:     "enhancement/medium",
 			cType:    TypeEnhancement,
 			cSize:    SizeMedium,
-			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageCharter, StageContextCheck, StageSpec, StageTasks, StageVerify},
 		},
 		{
 			name:     "enhancement/large",
 			cType:    TypeEnhancement,
 			cSize:    SizeLarge,
-			wantFlow: []ChangeStage{StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+			wantFlow: []ChangeStage{StageCharter, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 		},
 		// --- Error cases ---
 		{
@@ -165,7 +165,7 @@ func TestStageFilename(t *testing.T) {
 	}{
 		{StageDescribe, "describe.md"},
 		{StageScope, "scope.md"},
-		{StagePropose, "propose.md"},
+		{StageCharter, "charter.md"},
 		{StageContextCheck, "context-check.md"},
 		{StageSpec, "spec.md"},
 		{StageClarify, "clarify.md"},

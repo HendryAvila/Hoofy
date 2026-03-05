@@ -36,7 +36,7 @@ func testChangeRecord(id, desc string, ct ChangeType, cs ChangeSize) *ChangeReco
 
 func TestChangesPath(t *testing.T) {
 	got := ChangesPath("/root")
-	want := filepath.Join("/root", "sdd", ChangesDir)
+	want := filepath.Join("/root", "docs", ChangesDir)
 	if got != want {
 		t.Errorf("ChangesPath = %s, want %s", got, want)
 	}
@@ -44,7 +44,7 @@ func TestChangesPath(t *testing.T) {
 
 func TestHistoryPath(t *testing.T) {
 	got := HistoryPath("/root")
-	want := filepath.Join("/root", "sdd", HistoryDir)
+	want := filepath.Join("/root", "docs", HistoryDir)
 	if got != want {
 		t.Errorf("HistoryPath = %s, want %s", got, want)
 	}
@@ -52,7 +52,7 @@ func TestHistoryPath(t *testing.T) {
 
 func TestChangePath(t *testing.T) {
 	got := ChangePath("/root", "fix-bug")
-	want := filepath.Join("/root", "sdd", ChangesDir, "fix-bug")
+	want := filepath.Join("/root", "docs", ChangesDir, "fix-bug")
 	if got != want {
 		t.Errorf("ChangePath = %s, want %s", got, want)
 	}
@@ -60,7 +60,7 @@ func TestChangePath(t *testing.T) {
 
 func TestChangeConfigPath(t *testing.T) {
 	got := ChangeConfigPath("/root", "fix-bug")
-	want := filepath.Join("/root", "sdd", ChangesDir, "fix-bug", ChangeConfigFile)
+	want := filepath.Join("/root", "docs", ChangesDir, "fix-bug", ChangeConfigFile)
 	if got != want {
 		t.Errorf("ChangeConfigPath = %s, want %s", got, want)
 	}

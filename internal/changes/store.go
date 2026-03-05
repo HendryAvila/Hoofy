@@ -6,12 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/HendryAvila/Hoofy/internal/config"
 )
 
 const (
-	// ChangesDir is the subdirectory under sdd/ where changes live.
+	// ChangesDir is the subdirectory under docs/ where changes live.
 	ChangesDir = "changes"
-	// HistoryDir is the subdirectory under sdd/ where archived changes live.
+	// HistoryDir is the subdirectory under docs/ where archived changes live.
 	HistoryDir = "history"
 	// ChangeConfigFile is the filename for change records.
 	ChangeConfigFile = "change.json"
@@ -38,14 +40,14 @@ func NewFileStore() *FileStore {
 	return &FileStore{}
 }
 
-// ChangesPath returns the absolute path to the sdd/changes/ directory.
+// ChangesPath returns the absolute path to the docs/changes/ directory.
 func ChangesPath(projectRoot string) string {
-	return filepath.Join(projectRoot, "sdd", ChangesDir)
+	return filepath.Join(config.DocsPath(projectRoot), ChangesDir)
 }
 
-// HistoryPath returns the absolute path to the sdd/history/ directory.
+// HistoryPath returns the absolute path to the docs/history/ directory.
 func HistoryPath(projectRoot string) string {
-	return filepath.Join(projectRoot, "sdd", HistoryDir)
+	return filepath.Join(config.DocsPath(projectRoot), HistoryDir)
 }
 
 // ChangePath returns the absolute path to a specific change's directory.

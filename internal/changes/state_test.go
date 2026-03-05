@@ -264,7 +264,7 @@ func TestAdvance_FullFlow_FixSmall(t *testing.T) {
 
 func TestAdvance_FullFlow_FeatureLarge(t *testing.T) {
 	change := testActiveChange(TypeFeature, SizeLarge)
-	// propose → context-check → spec → clarify → design → tasks → verify
+	// charter → context-check → spec → clarify → design → tasks → verify
 	expected := []ChangeStage{StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify}
 
 	for _, want := range expected {
@@ -379,7 +379,7 @@ func TestCompleteChange_UpdatesTimestamp(t *testing.T) {
 
 func TestFullLifecycle_AdvanceThenComplete(t *testing.T) {
 	change := testActiveChange(TypeFeature, SizeMedium)
-	// propose → context-check → spec → tasks → verify
+	// charter → context-check → spec → tasks → verify
 
 	// Advance through all stages.
 	if err := Advance(change); err != nil {

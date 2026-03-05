@@ -80,7 +80,7 @@ type ChangeStage string
 const (
 	StageDescribe     ChangeStage = "describe"      // lightweight: what's the change?
 	StageScope        ChangeStage = "scope"         // refactor-specific: what changes, what doesn't
-	StagePropose      ChangeStage = "propose"       // full proposal
+	StageCharter      ChangeStage = "charter"       // full charter (expanded proposal)
 	StageContextCheck ChangeStage = "context-check" // scan existing specs/rules for conflicts
 	StageSpec         ChangeStage = "spec"          // requirements/spec for the change
 	StageClarify      ChangeStage = "clarify"       // ambiguity resolution (only for large changes)

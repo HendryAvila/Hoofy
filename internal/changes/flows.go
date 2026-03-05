@@ -22,8 +22,8 @@ var FlowRegistry = map[ChangeType]map[ChangeSize][]ChangeStage{
 	},
 	TypeFeature: {
 		SizeSmall:  {StageDescribe, StageContextCheck, StageTasks, StageVerify},
-		SizeMedium: {StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
-		SizeLarge:  {StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+		SizeMedium: {StageCharter, StageContextCheck, StageSpec, StageTasks, StageVerify},
+		SizeLarge:  {StageCharter, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 	},
 	TypeRefactor: {
 		SizeSmall:  {StageScope, StageContextCheck, StageTasks, StageVerify},
@@ -32,8 +32,8 @@ var FlowRegistry = map[ChangeType]map[ChangeSize][]ChangeStage{
 	},
 	TypeEnhancement: {
 		SizeSmall:  {StageDescribe, StageContextCheck, StageTasks, StageVerify},
-		SizeMedium: {StagePropose, StageContextCheck, StageSpec, StageTasks, StageVerify},
-		SizeLarge:  {StagePropose, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
+		SizeMedium: {StageCharter, StageContextCheck, StageSpec, StageTasks, StageVerify},
+		SizeLarge:  {StageCharter, StageContextCheck, StageSpec, StageClarify, StageDesign, StageTasks, StageVerify},
 	},
 }
 
@@ -66,7 +66,7 @@ func StageFlow(t ChangeType, s ChangeSize) ([]ChangeStage, error) {
 var stageFilenames = map[ChangeStage]string{
 	StageDescribe:     "describe.md",
 	StageScope:        "scope.md",
-	StagePropose:      "propose.md",
+	StageCharter:      "charter.md",
 	StageContextCheck: "context-check.md",
 	StageSpec:         "spec.md",
 	StageClarify:      "clarify.md",
