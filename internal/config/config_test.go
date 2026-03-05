@@ -24,8 +24,8 @@ func TestNewProjectConfig_SetsDefaults(t *testing.T) {
 	if cfg.Version != "0.1.0" {
 		t.Errorf("Version = %s, want 0.1.0", cfg.Version)
 	}
-	if cfg.CurrentStage != StagePropose {
-		t.Errorf("CurrentStage = %s, want propose", cfg.CurrentStage)
+	if cfg.CurrentStage != StagePrinciples {
+		t.Errorf("CurrentStage = %s, want principles", cfg.CurrentStage)
 	}
 	if cfg.ClarityScore != 0 {
 		t.Errorf("ClarityScore = %d, want 0", cfg.ClarityScore)
@@ -88,28 +88,106 @@ func TestNewProjectConfig_AllStagesPresent(t *testing.T) {
 
 // --- Path helpers ---
 
-func TestSDDPath(t *testing.T) {
-	got := SDDPath("/home/user/project")
-	want := filepath.Join("/home/user/project", SDDDir)
+func TestDocsPath(t *testing.T) {
+	// No hoofy.json exists → defaults to docs/
+	tmpDir := t.TempDir()
+	got := DocsPath(tmpDir)
+	want := filepath.Join(tmpDir, DocsDir)
 	if got != want {
-		t.Errorf("SDDPath = %s, want %s", got, want)
+		t.Errorf("DocsPath = %s, want %s", got, want)
 	}
 }
 
 func TestConfigPath(t *testing.T) {
-	got := ConfigPath("/home/user/project")
-	want := filepath.Join("/home/user/project", SDDDir, ConfigFile)
+	tmpDir := t.TempDir()
+	got := ConfigPath(tmpDir)
+	want := filepath.Join(tmpDir, DocsDir, ConfigFile)
 	if got != want {
 		t.Errorf("ConfigPath = %s, want %s", got, want)
 	}
 }
 
+func TestResolveDocsDir_DefaultDocs(t *testing.T) {
+	tmpDir := t.TempDir()
+	// No hoofy.json anywhere → default to "docs"
+	got := ResolveDocsDir(tmpDir)
+	if got != DocsDir {
+		t.Errorf("ResolveDocsDir = %s, want %s", got, DocsDir)
+	}
+}
+
+func TestResolveDocsDir_PrimaryPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create docs/hoofy.json
+	docsDir := filepath.Join(tmpDir, DocsDir)
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docsDir, ConfigFile), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ResolveDocsDir(tmpDir)
+	if got != DocsDir {
+		t.Errorf("ResolveDocsDir = %s, want %s", got, DocsDir)
+	}
+}
+
+func TestResolveDocsDir_FallbackPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create docs/ with some content (but no hoofy.json)
+	docsDir := filepath.Join(tmpDir, DocsDir)
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docsDir, "README.md"), []byte("# Docs"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Create docs/specs/hoofy.json (fallback)
+	specsDir := filepath.Join(docsDir, DocsDirFallback)
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specsDir, ConfigFile), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ResolveDocsDir(tmpDir)
+	want := filepath.Join(DocsDir, DocsDirFallback)
+	if got != want {
+		t.Errorf("ResolveDocsDir = %s, want %s", got, want)
+	}
+}
+
+func TestResolveDocsDir_PrimaryTakesPrecedenceOverFallback(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Create BOTH docs/hoofy.json and docs/specs/hoofy.json
+	docsDir := filepath.Join(tmpDir, DocsDir)
+	specsDir := filepath.Join(docsDir, DocsDirFallback)
+	if err := os.MkdirAll(specsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docsDir, ConfigFile), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specsDir, ConfigFile), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := ResolveDocsDir(tmpDir)
+	if got != DocsDir {
+		t.Errorf("ResolveDocsDir = %s, want %s (primary should take precedence)", got, DocsDir)
+	}
+}
+
 func TestStagePath_KnownStages(t *testing.T) {
+	tmpDir := t.TempDir()
 	tests := []struct {
 		stage    Stage
 		wantFile string
 	}{
-		{StagePropose, "proposal.md"},
+		{StagePrinciples, "principles.md"},
+		{StageCharter, "charter.md"},
 		{StageSpecify, "requirements.md"},
 		{StageClarify, "clarifications.md"},
 		{StageDesign, "design.md"},
@@ -118,8 +196,8 @@ func TestStagePath_KnownStages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(string(tt.stage), func(t *testing.T) {
-			got := StagePath("/root", tt.stage)
-			want := filepath.Join("/root", SDDDir, tt.wantFile)
+			got := StagePath(tmpDir, tt.stage)
+			want := filepath.Join(tmpDir, DocsDir, tt.wantFile)
 			if got != want {
 				t.Errorf("StagePath(%s) = %s, want %s", tt.stage, got, want)
 			}
@@ -128,14 +206,16 @@ func TestStagePath_KnownStages(t *testing.T) {
 }
 
 func TestStagePath_UnknownStage(t *testing.T) {
-	got := StagePath("/root", Stage("unknown"))
+	tmpDir := t.TempDir()
+	got := StagePath(tmpDir, Stage("unknown"))
 	if got != "" {
 		t.Errorf("StagePath(unknown) = %s, want empty string", got)
 	}
 }
 
 func TestStagePath_Init_HasNoFile(t *testing.T) {
-	got := StagePath("/root", StageInit)
+	tmpDir := t.TempDir()
+	got := StagePath(tmpDir, StageInit)
 	if got != "" {
 		t.Errorf("StagePath(init) = %s, want empty string (init has no artifact)", got)
 	}
@@ -191,13 +271,13 @@ func TestFileStore_SaveCreatesDirectories(t *testing.T) {
 		t.Fatalf("Save failed: %v", err)
 	}
 
-	sddDir := SDDPath(tmpDir)
-	info, err := os.Stat(sddDir)
+	docsDir := DocsPath(tmpDir)
+	info, err := os.Stat(docsDir)
 	if err != nil {
-		t.Fatalf("sdd dir not created: %v", err)
+		t.Fatalf("docs dir not created: %v", err)
 	}
 	if !info.IsDir() {
-		t.Error("sdd path is not a directory")
+		t.Error("docs path is not a directory")
 	}
 }
 
@@ -262,9 +342,9 @@ func TestFileStore_Load_NotInitialized(t *testing.T) {
 func TestFileStore_Load_CorruptJSON(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	// Create the sdd dir and write garbage.
-	sddDir := SDDPath(tmpDir)
-	if err := os.MkdirAll(sddDir, 0o755); err != nil {
+	// Create the docs dir and write garbage.
+	docsDir := DocsPath(tmpDir)
+	if err := os.MkdirAll(docsDir, 0o755); err != nil {
 		t.Fatalf("MkdirAll failed: %v", err)
 	}
 	if err := os.WriteFile(ConfigPath(tmpDir), []byte("not json"), 0o644); err != nil {
@@ -276,7 +356,7 @@ func TestFileStore_Load_CorruptJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("Load should fail on corrupt JSON")
 	}
-	if got := err.Error(); !stringContains(got, "parsing sdd.json") {
+	if got := err.Error(); !stringContains(got, "parsing hoofy.json") {
 		t.Errorf("unexpected error: %s", got)
 	}
 }
@@ -320,6 +400,21 @@ func TestStages_OrderFieldMatchesPosition(t *testing.T) {
 		if meta.Order != i {
 			t.Errorf("Stages[%s].Order = %d, but position in StageOrder = %d", stage, meta.Order, i)
 		}
+	}
+}
+
+func TestStageOrder_Has9Stages(t *testing.T) {
+	if got := len(StageOrder); got != 9 {
+		t.Errorf("len(StageOrder) = %d, want 9", got)
+	}
+}
+
+func TestStageFilenames_PrinciplesAndCharter(t *testing.T) {
+	if got := StageFilename(StagePrinciples); got != "principles.md" {
+		t.Errorf("StageFilename(principles) = %s, want principles.md", got)
+	}
+	if got := StageFilename(StageCharter); got != "charter.md" {
+		t.Errorf("StageFilename(charter) = %s, want charter.md", got)
 	}
 }
 

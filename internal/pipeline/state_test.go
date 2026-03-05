@@ -45,13 +45,14 @@ func TestStageIndex_AllStages(t *testing.T) {
 		want  int
 	}{
 		{config.StageInit, 0},
-		{config.StagePropose, 1},
-		{config.StageSpecify, 2},
-		{config.StageBusinessRules, 3},
-		{config.StageClarify, 4},
-		{config.StageDesign, 5},
-		{config.StageTasks, 6},
-		{config.StageValidate, 7},
+		{config.StagePrinciples, 1},
+		{config.StageCharter, 2},
+		{config.StageSpecify, 3},
+		{config.StageBusinessRules, 4},
+		{config.StageClarify, 5},
+		{config.StageDesign, 6},
+		{config.StageTasks, 7},
+		{config.StageValidate, 8},
 	}
 
 	for _, tt := range tests {
@@ -88,9 +89,9 @@ func newTestConfig(stage config.Stage, mode config.Mode, clarityScore int) *conf
 }
 
 func TestCanAdvance_NormalStage(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 	if err := CanAdvance(cfg); err != nil {
-		t.Errorf("CanAdvance(propose) should succeed, got: %v", err)
+		t.Errorf("CanAdvance(charter) should succeed, got: %v", err)
 	}
 }
 
@@ -152,9 +153,9 @@ func TestCanAdvance_UnknownStage(t *testing.T) {
 // --- Advance ---
 
 func TestAdvance_MovesToNextStage(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 	if err := Advance(cfg); err != nil {
-		t.Fatalf("Advance(propose) failed: %v", err)
+		t.Fatalf("Advance(charter) failed: %v", err)
 	}
 	if cfg.CurrentStage != config.StageSpecify {
 		t.Errorf("CurrentStage = %s, want %s", cfg.CurrentStage, config.StageSpecify)
@@ -162,20 +163,20 @@ func TestAdvance_MovesToNextStage(t *testing.T) {
 }
 
 func TestAdvance_MarksPreviousCompleted(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 	_ = Advance(cfg)
 
-	proposeStatus := cfg.StageStatus[config.StagePropose]
-	if proposeStatus.Status != "completed" {
-		t.Errorf("propose status = %s, want completed", proposeStatus.Status)
+	charterStatus := cfg.StageStatus[config.StageCharter]
+	if charterStatus.Status != "completed" {
+		t.Errorf("charter status = %s, want completed", charterStatus.Status)
 	}
-	if proposeStatus.CompletedAt == "" {
-		t.Error("propose CompletedAt should be set")
+	if charterStatus.CompletedAt == "" {
+		t.Error("charter CompletedAt should be set")
 	}
 }
 
 func TestAdvance_MarksNextInProgress(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 	_ = Advance(cfg)
 
 	specifyStatus := cfg.StageStatus[config.StageSpecify]
@@ -213,7 +214,8 @@ func TestAdvance_FullPipeline(t *testing.T) {
 	cfg := newTestConfig(config.StageInit, config.ModeExpert, 0)
 
 	expected := []config.Stage{
-		config.StagePropose,
+		config.StagePrinciples,
+		config.StageCharter,
 		config.StageSpecify,
 		config.StageBusinessRules,
 		config.StageClarify,
@@ -243,13 +245,13 @@ func TestAdvance_FullPipeline(t *testing.T) {
 // --- MarkInProgress ---
 
 func TestMarkInProgress_IncrementsIterations(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 
 	MarkInProgress(cfg)
 	MarkInProgress(cfg)
 	MarkInProgress(cfg)
 
-	st := cfg.StageStatus[config.StagePropose]
+	st := cfg.StageStatus[config.StageCharter]
 	if st.Iterations != 3 {
 		t.Errorf("Iterations = %d, want 3", st.Iterations)
 	}
@@ -259,13 +261,13 @@ func TestMarkInProgress_IncrementsIterations(t *testing.T) {
 }
 
 func TestMarkInProgress_PreservesStartedAt(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 
 	MarkInProgress(cfg)
-	firstStartedAt := cfg.StageStatus[config.StagePropose].StartedAt
+	firstStartedAt := cfg.StageStatus[config.StageCharter].StartedAt
 
 	MarkInProgress(cfg)
-	secondStartedAt := cfg.StageStatus[config.StagePropose].StartedAt
+	secondStartedAt := cfg.StageStatus[config.StageCharter].StartedAt
 
 	if firstStartedAt != secondStartedAt {
 		t.Errorf("StartedAt changed across iterations: %s → %s", firstStartedAt, secondStartedAt)
@@ -275,40 +277,40 @@ func TestMarkInProgress_PreservesStartedAt(t *testing.T) {
 // --- IsCompleted ---
 
 func TestIsCompleted_False_WhenPending(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
-	if IsCompleted(cfg, config.StagePropose) {
-		t.Error("propose should not be completed")
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
+	if IsCompleted(cfg, config.StageCharter) {
+		t.Error("charter should not be completed")
 	}
 }
 
 func TestIsCompleted_True_AfterAdvance(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 	_ = Advance(cfg)
-	if !IsCompleted(cfg, config.StagePropose) {
-		t.Error("propose should be completed after advancing")
+	if !IsCompleted(cfg, config.StageCharter) {
+		t.Error("charter should be completed after advancing")
 	}
 }
 
 // --- RequireStage ---
 
 func TestRequireStage_Matches(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
-	if err := RequireStage(cfg, config.StagePropose); err != nil {
-		t.Errorf("RequireStage(propose, propose) should pass, got: %v", err)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
+	if err := RequireStage(cfg, config.StageCharter); err != nil {
+		t.Errorf("RequireStage(charter, charter) should pass, got: %v", err)
 	}
 }
 
 func TestRequireStage_Mismatch(t *testing.T) {
-	cfg := newTestConfig(config.StagePropose, config.ModeGuided, 0)
+	cfg := newTestConfig(config.StageCharter, config.ModeGuided, 0)
 	err := RequireStage(cfg, config.StageClarify)
 	if err == nil {
-		t.Fatal("RequireStage(propose, clarify) should fail")
+		t.Fatal("RequireStage(charter, clarify) should fail")
 	}
 	got := err.Error()
 	if !contains(got, "wrong pipeline stage") {
 		t.Errorf("unexpected error: %s", got)
 	}
-	if !contains(got, "propose") || !contains(got, "clarify") {
+	if !contains(got, "charter") || !contains(got, "clarify") {
 		t.Errorf("error should mention both stages: %s", got)
 	}
 }

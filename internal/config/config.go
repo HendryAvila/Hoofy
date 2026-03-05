@@ -1,7 +1,7 @@
-// Package config handles SDD project configuration persistence.
+// Package config handles Hoofy project configuration persistence.
 //
 // It follows the Single Responsibility Principle: this package ONLY deals with
-// the sdd.json configuration file - reading, writing, and providing type definitions.
+// the hoofy.json configuration file - reading, writing, and providing type definitions.
 // Pipeline logic (transitions, validation) lives in the pipeline package.
 package config
 
@@ -14,10 +14,12 @@ import (
 )
 
 const (
-	// SDDDir is the directory name where SDD artifacts live.
-	SDDDir = "sdd"
-	// ConfigFile is the SDD configuration filename.
-	ConfigFile = "sdd.json"
+	// DocsDir is the default directory name where Hoofy artifacts live.
+	DocsDir = "docs"
+	// DocsDirFallback is the subdirectory used when docs/ already exists with non-Hoofy content.
+	DocsDirFallback = "specs"
+	// ConfigFile is the Hoofy configuration filename.
+	ConfigFile = "hoofy.json"
 )
 
 // Mode controls how the SDD pipeline interacts with the user.
@@ -37,7 +39,8 @@ type Stage string
 
 const (
 	StageInit          Stage = "init"
-	StagePropose       Stage = "propose"
+	StagePrinciples    Stage = "principles"
+	StageCharter       Stage = "charter"
 	StageSpecify       Stage = "specify"
 	StageBusinessRules Stage = "business-rules"
 	StageClarify       Stage = "clarify"
@@ -50,7 +53,8 @@ const (
 // to determine valid transitions.
 var StageOrder = []Stage{
 	StageInit,
-	StagePropose,
+	StagePrinciples,
+	StageCharter,
 	StageSpecify,
 	StageBusinessRules,
 	StageClarify,
@@ -68,14 +72,15 @@ type StageMetadata struct {
 
 // Stages maps each Stage to its metadata.
 var Stages = map[Stage]StageMetadata{
-	StageInit:          {Name: "Initialize", Description: "Set up project context, constraints, and SDD structure", Order: 0},
-	StagePropose:       {Name: "Propose", Description: "Transform a vague idea into a structured proposal", Order: 1},
-	StageSpecify:       {Name: "Specify", Description: "Extract formal requirements from the proposal", Order: 2},
-	StageBusinessRules: {Name: "Business Rules", Description: "Extract and document declarative business rules from requirements", Order: 3},
-	StageClarify:       {Name: "Clarify", Description: "Detect and resolve ambiguities through the Clarity Gate", Order: 4},
-	StageDesign:        {Name: "Design", Description: "Create technical architecture and design decisions", Order: 5},
-	StageTasks:         {Name: "Tasks", Description: "Break down design into atomic, actionable tasks", Order: 6},
-	StageValidate:      {Name: "Validate", Description: "Verify consistency across all artifacts", Order: 7},
+	StageInit:          {Name: "Initialize", Description: "Set up project context, constraints, and Hoofy structure", Order: 0},
+	StagePrinciples:    {Name: "Principles", Description: "Define golden invariants, coding standards, and domain truths", Order: 1},
+	StageCharter:       {Name: "Charter", Description: "Define project scope, vision, stakeholders, and boundaries", Order: 2},
+	StageSpecify:       {Name: "Specify", Description: "Extract formal requirements from the charter", Order: 3},
+	StageBusinessRules: {Name: "Business Rules", Description: "Extract and document declarative business rules from requirements", Order: 4},
+	StageClarify:       {Name: "Clarify", Description: "Detect and resolve ambiguities through the Clarity Gate", Order: 5},
+	StageDesign:        {Name: "Design", Description: "Create technical architecture and design decisions", Order: 6},
+	StageTasks:         {Name: "Tasks", Description: "Break down design into atomic, actionable tasks", Order: 7},
+	StageValidate:      {Name: "Validate", Description: "Verify consistency across all artifacts", Order: 8},
 }
 
 // StageStatus tracks progress for a single pipeline stage.
@@ -86,7 +91,7 @@ type StageStatus struct {
 	Iterations  int    `json:"iterations"`
 }
 
-// ProjectConfig is the root configuration persisted in sdd.json.
+// ProjectConfig is the root configuration persisted in hoofy.json.
 type ProjectConfig struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -122,7 +127,7 @@ func NewProjectConfig(name, description string, mode Mode) *ProjectConfig {
 		Description:  description,
 		Version:      "0.1.0",
 		Mode:         mode,
-		CurrentStage: StagePropose,
+		CurrentStage: StagePrinciples,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 		StageStatus:  status,
@@ -132,14 +137,33 @@ func NewProjectConfig(name, description string, mode Mode) *ProjectConfig {
 
 // --- Path helpers ---
 
-// SDDPath returns the absolute path to the sdd/ directory.
-func SDDPath(projectRoot string) string {
-	return filepath.Join(projectRoot, SDDDir)
+// ResolveDocsDir determines the docs directory relative to projectRoot.
+// Resolution algorithm:
+//  1. If docs/hoofy.json exists → "docs"
+//  2. If docs/specs/hoofy.json exists → "docs/specs"
+//  3. Neither exists → default to "docs" (for new projects)
+func ResolveDocsDir(projectRoot string) string {
+	primary := filepath.Join(projectRoot, DocsDir, ConfigFile)
+	if _, err := os.Stat(primary); err == nil {
+		return DocsDir
+	}
+
+	fallback := filepath.Join(projectRoot, DocsDir, DocsDirFallback, ConfigFile)
+	if _, err := os.Stat(fallback); err == nil {
+		return filepath.Join(DocsDir, DocsDirFallback)
+	}
+
+	return DocsDir
 }
 
-// ConfigPath returns the absolute path to sdd.json.
+// DocsPath returns the absolute path to the resolved docs directory.
+func DocsPath(projectRoot string) string {
+	return filepath.Join(projectRoot, ResolveDocsDir(projectRoot))
+}
+
+// ConfigPath returns the absolute path to hoofy.json.
 func ConfigPath(projectRoot string) string {
-	return filepath.Join(projectRoot, SDDDir, ConfigFile)
+	return filepath.Join(DocsPath(projectRoot), ConfigFile)
 }
 
 // StagePath returns the absolute path to a stage's markdown artifact.
@@ -148,7 +172,12 @@ func StagePath(projectRoot string, stage Stage) string {
 	if filename == "" {
 		return ""
 	}
-	return filepath.Join(projectRoot, SDDDir, filename)
+	return filepath.Join(DocsPath(projectRoot), filename)
+}
+
+// ADRsPath returns the absolute path to the central ADRs directory.
+func ADRsPath(projectRoot string) string {
+	return filepath.Join(DocsPath(projectRoot), "adrs")
 }
 
 // StageFilename returns the output filename for a stage, or empty if none.
@@ -158,7 +187,8 @@ func StageFilename(stage Stage) string {
 
 // stageFilenames maps stages to their output filenames.
 var stageFilenames = map[Stage]string{
-	StagePropose:       "proposal.md",
+	StagePrinciples:    "principles.md",
+	StageCharter:       "charter.md",
 	StageSpecify:       "requirements.md",
 	StageBusinessRules: "business-rules.md",
 	StageClarify:       "clarifications.md",
@@ -195,25 +225,25 @@ func NewFileStore() *FileStore {
 	return &FileStore{}
 }
 
-// Load reads and parses sdd.json from disk.
+// Load reads and parses hoofy.json from disk.
 func (fs *FileStore) Load(projectRoot string) (*ProjectConfig, error) {
 	path := ConfigPath(projectRoot)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("SDD project not initialized — run sdd_init_project first")
+			return nil, fmt.Errorf("Hoofy project not initialized — run sdd_init_project first")
 		}
 		return nil, fmt.Errorf("reading config: %w", err)
 	}
 
 	var cfg ProjectConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing sdd.json: %w", err)
+		return nil, fmt.Errorf("parsing hoofy.json: %w", err)
 	}
 	return &cfg, nil
 }
 
-// Save writes the config to sdd.json, creating directories as needed.
+// Save writes the config to hoofy.json, creating directories as needed.
 func (fs *FileStore) Save(projectRoot string, cfg *ProjectConfig) error {
 	cfg.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 
@@ -224,13 +254,13 @@ func (fs *FileStore) Save(projectRoot string, cfg *ProjectConfig) error {
 
 	dir := filepath.Dir(ConfigPath(projectRoot))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("creating sdd directory: %w", err)
+		return fmt.Errorf("creating docs directory: %w", err)
 	}
 
 	return os.WriteFile(ConfigPath(projectRoot), data, 0o644)
 }
 
-// Exists checks whether an SDD project is initialized at the given root.
+// Exists checks whether a Hoofy project is initialized at the given root.
 func Exists(projectRoot string) bool {
 	_, err := os.Stat(ConfigPath(projectRoot))
 	return err == nil
