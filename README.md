@@ -31,52 +31,66 @@
 
 ---
 
-## What Is Hoofy? — AI Development Companion for MCP
+## Start Here (TL;DR)
 
-Hoofy is an AI coding tool that solves the three biggest problems with AI-assisted development: **memory loss between sessions**, **hallucinated implementations**, and **unstructured AI workflows**. It's a single [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server written in Go — one binary, zero dependencies — that works with Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode, and any MCP-compatible AI tool.
+If the README felt overwhelming, use this section first.
 
-Hoofy is four systems in one MCP server:
-
-| System | What it does | Tools |
-|---|---|---|
-| **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. Decisions, bugs, patterns, discoveries — your AI remembers what happened yesterday. | `mem_*` tools |
-| **Change Pipeline** | Adaptive workflow for ongoing dev. Picks the right stages based on change type × size (12 flow variants). Includes mandatory **context-check** and **artifact guard** stages. | 5 `sdd_change*` + `sdd_adr` |
-| **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate, **principles** declaration, and **business rules extraction** that blocks hallucinations. 9-stage pipeline: init → principles → charter → specify → business-rules → clarify → design → tasks → validate. | `sdd_*` project tools |
-| **Bootstrap** | Reverse-engineer existing codebases into SDD artifacts. Scans project structure, configs, conventions, schemas, and tests — then generates requirements, business rules, and design docs. | `sdd_reverse_engineer` + `sdd_bootstrap` |
-
-One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode.
+- **Hoofy is an MCP server** that gives your AI persistent memory + spec-driven workflow.
+- It prevents the classic AI failure modes: forgetting context, hallucinating requirements, and skipping planning.
+- It works with Claude Code, Cursor, VS Code Copilot, OpenCode, Gemini CLI (and any MCP-compatible tool).
+- You can use it for **new projects**, **ongoing changes**, or **existing projects without specs**.
+- Install, connect MCP, and start with a small change.
 
 ### 60-Second Quick Start
 
 1. Install Hoofy: `brew install HendryAvila/hoofy/hoofy` (or use the install script below).
 2. Connect MCP: `claude mcp add --scope user hoofy hoofy serve` (or use your editor's MCP config).
-3. Start working: ask your AI for a feature/fix and let Hoofy drive SDD + memory automatically.
+3. Ask your AI to implement a change — Hoofy guides planning + memory automatically.
 
-### Why Hoofy?
+### What Is Hoofy? — AI Development Companion for MCP
 
-AI coding assistants are powerful but forgetful and overconfident. Studies show experienced developers are [19% slower with unstructured AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) (METR 2025), and AI adoption without structure causes [7.2% delivery instability](https://dora.dev/research/2025/dora-report/) (DORA 2025). Hoofy fixes this by making your AI assistant remember context, follow specifications, and prove it understood before writing code.
+Hoofy solves three recurring AI-dev problems: **memory loss between sessions**, **hallucinated implementations**, and **unstructured workflows**. It's a single [MCP (Model Context Protocol)](https://modelcontextprotocol.io) server written in Go — one binary, zero external runtime dependencies.
 
-### Key Features
+### Choose your path
 
-**Principles-First Pipeline** — Before writing a single requirement, the pipeline now captures **golden invariants** — project principles, coding standards, and domain truths that remain constant throughout the project lifecycle. These anchor every subsequent stage: requirements must respect principles, designs must implement them, and the Clarity Gate evaluates against them.
+- **New project** → run the full project pipeline (`sdd_init_project` → ... → `sdd_validate`)
+- **Existing project, adding/fixing something** → start with `sdd_change`
+- **Existing project with no specs yet** → `sdd_reverse_engineer` + `sdd_bootstrap`
+- **Just need context/review quickly** → `sdd_suggest_context`, `sdd_review`, `sdd_audit`
 
-**Project Charter** — The old "proposal" stage is now a **charter** — an enterprise-grade project definition with expanded fields: domain context, stakeholders, vision, boundaries, success criteria, existing systems, and constraints. Four required fields keep it lightweight for small projects; six optional fields scale up for enterprise use.
+### Core systems (at a glance)
 
-**Spec-vs-Code Audit** — `sdd_audit` compares your specifications against actual source code and reports discrepancies: missing implementations, stale specs, and inconsistencies. Read-only scanner — produces a structured report for the AI to analyze. Works standalone without an active pipeline.
+| System | What it does | Tools |
+|---|---|---|
+| **Memory** | Persistent context across sessions using SQLite + FTS5 full-text search. | `mem_*` tools |
+| **Change Pipeline** | Adaptive flow for ongoing work based on change type × size (12 variants). | `sdd_change*`, `sdd_adr` |
+| **Project Pipeline** | Full greenfield specification flow with Clarity Gate (9 stages). | `sdd_*` project tools |
+| **Bootstrap** | Reverse-engineer existing codebases into requirements, rules, and design artifacts. | `sdd_reverse_engineer`, `sdd_bootstrap` |
 
-**Auto-Generated Agent Instructions** — `sdd_init_project` now auto-generates an SDD instructions section in your project's agent file (CLAUDE.md, AGENTS.md, or creates AGENTS.md). Idempotent — won't duplicate if already present. Ensures every developer's AI knows about the project's specs from the first session.
+### Key features (most important)
 
-**Unified ADR Storage** — Architecture Decision Records are always stored in `docs/adrs/` with sequential `NNN-slug.md` naming. No more scattered ADRs — standalone ADRs get files too (previously memory-only). `nextADRNumber()` handles gaps gracefully.
+- **Principles-first pipeline** — define non-negotiables before requirements.
+- **Clarity Gate** — blocks vague specs before implementation starts.
+- **Context-check on every change** — catches conflicts early.
+- **Spec-aware review/audit** — compare code against requirements and rules.
+- **Persistent memory + knowledge graph** — decisions and fixes remain searchable.
+- **Hot/cold instructions** — lightweight core instructions + on-demand guides.
 
-**Hot/Cold Instruction Architecture** — Server instructions are kept minimal (~160 lines of "constitution") to reduce token overhead. Detailed guidance for specific workflows is loaded on-demand via 6 MCP prompts (`/sdd-start`, `/sdd-status`, `/sdd-stage-guide`, `/sdd-memory-guide`, `/sdd-change-guide`, `/sdd-bootstrap-guide`). The AI requests the right prompt when it needs it — like loading a manual chapter instead of carrying the entire book. Inspired by research showing that compact constitutions with on-demand retrieval reduce token consumption by ~17%.
+<details>
+<summary><strong>See full feature details</strong></summary>
 
-**Spec-Aware Code Review** — `sdd_review` runs a code review against your project's specifications, not just generic best practices. It parses requirements (FR-XXX), business rules (BRC-XXX constraints), design decisions, and ADRs from memory to generate a review checklist. Works standalone — no active pipeline needed. Give it a task description and it tells you what to verify.
-
-**Ad-Hoc Context Suggestion** — `sdd_suggest_context` bridges the gap for sessions that don't use a formal pipeline. Give it a task description and it scans your specs, completed changes, memory observations, and project conventions to recommend what context to read before starting. Works without `hoofy.json` or an active change.
-
-**Existing Project Bootstrap** — Got an existing codebase with no specs? `sdd_reverse_engineer` scans your project (directory structure, package manifests, configs, entry points, conventions, schemas, API definitions, ADRs, tests) and produces a structured report. Then `sdd_bootstrap` writes the missing SDD artifacts — requirements, business rules, and design docs — so the change pipeline works intelligently from day one. Medium/large changes are **blocked** without artifacts; small changes get a warning.
-
-**Knowledge Graph** — Memory observations aren't flat notes. You can connect them with typed, directional relations (`depends_on`, `caused_by`, `implements`, `supersedes`, `relates_to`, `part_of`) to build a navigable web of project knowledge. Use `mem_get` with `depth` to traverse graph context from any observation and pull in related decisions, bugs, and patterns automatically.
+- **Project Charter** — The old "proposal" stage is now a **charter** with domain context, stakeholders, vision, boundaries, success criteria, existing systems, and constraints.
+- **Spec-vs-Code Audit** — `sdd_audit` compares specifications against source code to detect missing implementations and drift.
+- **Auto-Generated Agent Instructions** — `sdd_init_project` injects SDD instructions into CLAUDE.md/AGENTS.md (idempotent).
+- **Unified ADR Storage** — ADRs are always written to `docs/adrs/NNN-slug.md`.
+- **Spec-Aware Code Review** — `sdd_review` generates a checklist tied to FR/NFR/business rules/ADRs.
+- **Ad-Hoc Context Suggestion** — `sdd_suggest_context` recommends what to read before implementation.
+- **Existing Project Bootstrap** — `sdd_reverse_engineer` + `sdd_bootstrap` create missing artifacts for legacy codebases.
+- **Knowledge Graph** — relate observations with typed edges (`depends_on`, `caused_by`, `implements`, etc.).
+- **Facade-First Tooling** — unified memory entry points: `mem_save` and `mem_session`.
+- **Business Rules Stage** — BRG + DDD extraction before Clarity Gate.
+- **Pre-pipeline Exploration** — `sdd_explore` captures goals/constraints/unknowns before formal pipeline work.
+- **Wave Assignments** — task dependency waves for parallel execution planning.
 
 ```
 Decision: "Switched to JWT"  →(caused_by)→  Discovery: "Session storage doesn't scale"
@@ -84,15 +98,11 @@ Decision: "Switched to JWT"  →(caused_by)→  Discovery: "Session storage does
 Bugfix: "Fixed token expiry"              Pattern: "Retry with backoff"
 ```
 
-**Context Check** — Every change pipeline flow now starts with a mandatory context-check stage. Before writing a single spec or line of code, Hoofy scans your existing specs, completed changes, memory observations, and convention files (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, etc.) to detect conflicts and ambiguities. Zero issues = green light. Issues found = must resolve before proceeding. Even a one-line fix can break an existing business rule.
+</details>
 
-**Facade-First Tooling** — Hoofy now includes unified memory entrypoints to reduce tool-selection overhead: `mem_save` (`save_type`) and `mem_session` (`action`).
+### Why Hoofy?
 
-**Business Rules** — In the greenfield project pipeline, a dedicated business-rules stage extracts declarative rules from your requirements using BRG taxonomy (Definitions, Facts, Constraints, Derivations) and DDD Ubiquitous Language — before the Clarity Gate evaluates them. Rules inform the gate, not the other way around.
-
-**Pre-pipeline Exploration** — Before committing to a pipeline, use `sdd_explore` to capture unstructured thinking — goals, constraints, tech preferences, unknowns, decisions. It saves structured context to memory via topic key upsert (call it multiple times as your thinking evolves — it updates, never duplicates). It also suggests a change type and size based on keywords, so you start the right pipeline.
-
-**Wave Assignments** — When creating tasks (in either pipeline), the AI can group them into parallel execution waves derived from the dependency graph. Wave 1 has no dependencies, Wave 2 depends only on Wave 1, and so on. This tells you exactly which tasks can run in parallel and which must wait — useful for team coordination or just knowing the critical path.
+AI coding assistants are powerful but forgetful and overconfident. Studies show experienced developers are [19% slower with unstructured AI](https://metr.org/blog/2025-07-10-early-2025-ai-experienced-os-dev-study/) (METR 2025), and AI adoption without structure causes [7.2% delivery instability](https://dora.dev/research/2025/dora-report/) (DORA 2025). Hoofy fixes this by making your AI remember context, follow specifications, and validate understanding before coding.
 
 ### How it flows
 
