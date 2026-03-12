@@ -5,7 +5,7 @@
 <h1 align="center">Hoofy</h1>
 
 <p align="center">
-  <strong>The AI coding assistant that remembers everything and never hallucinates specs.</strong><br>
+  <strong>The AI coding assistant that remembers context and reduces spec hallucinations.</strong><br>
   An MCP server that gives your AI persistent memory, structured specifications,<br>
   and adaptive change management — so it builds what you actually want.
 </p>
@@ -44,7 +44,13 @@ Hoofy is four systems in one MCP server:
 | **Project Pipeline** | Full greenfield specification — from vague idea to validated architecture with a Clarity Gate, **principles** declaration, and **business rules extraction** that blocks hallucinations. 9-stage pipeline: init → principles → charter → specify → business-rules → clarify → design → tasks → validate. | `sdd_*` project tools |
 | **Bootstrap** | Reverse-engineer existing codebases into SDD artifacts. Scans project structure, configs, conventions, schemas, and tests — then generates requirements, business rules, and design docs. | `sdd_reverse_engineer` + `sdd_bootstrap` |
 
-One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode. **35 tools + 6 on-demand prompts.**
+One binary. Zero external dependencies. SQLite embedded at compile time. Works with **any** MCP-compatible AI coding assistant — Claude Code, Cursor, VS Code Copilot, Gemini CLI, OpenCode.
+
+### 60-Second Quick Start
+
+1. Install Hoofy: `brew install HendryAvila/hoofy/hoofy` (or use the install script below).
+2. Connect MCP: `claude mcp add --scope user hoofy hoofy serve` (or use your editor's MCP config).
+3. Start working: ask your AI for a feature/fix and let Hoofy drive SDD + memory automatically.
 
 ### Why Hoofy?
 
@@ -117,9 +123,9 @@ flowchart TB
 
     subgraph memory ["Memory (always active)"]
         direction LR
-        M1[Session Start] --> M2["Work + Save Discoveries"]
+        M1["mem_session(action=start)"] --> M2["Work + mem_save"]
         M2 --> M3["Connect with Relations"]
-        M3 --> M4[Session Summary]
+        M3 --> M4["mem_session(action=end, summary)"]
     end
 
     explore -.->|"captures context before"| project
@@ -137,7 +143,7 @@ flowchart TB
     style C5 fill:#10b981,stroke:#059669,color:#fff
 ```
 
-> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference (35 tools)](docs/tool-reference.md)**
+> **[Full workflow guide with step-by-step examples](docs/workflow-guide.md)** · **[Complete tool reference](docs/tool-reference.md)**
 
 ---
 
@@ -187,7 +193,7 @@ make build
 
 > **MCP Server vs Plugin — what's the difference?**
 >
- > The **MCP server** is Hoofy itself — the binary you just installed. It provides 35 tools and 6 on-demand prompts (memory, change pipeline, project pipeline, bootstrap, standalone) and works with **any** MCP-compatible AI tool.
+ > The **MCP server** is Hoofy itself — the binary you just installed. It provides memory, change pipeline, project pipeline, bootstrap, and standalone tooling through MCP and works with **any** MCP-compatible AI tool.
 >
 > The **Plugin** is a Claude Code-only enhancement that layers additional capabilities on top of the MCP server:
 >
@@ -300,101 +306,30 @@ Auto-checks on startup, updates when you say so.
 
 ### 5. Reinforce the behavior (recommended)
 
-Hoofy already includes built-in server instructions, but adding a short block to your agent's instructions file reinforces the habit — the AI will think about specs *before* it even sees the tools.
+Hoofy already includes built-in server instructions, but a short policy block in your agent instructions file reinforces the workflow.
 
-> **Note:** In v1.0, `sdd_init_project` auto-generates this section for you. The instructions below are only needed if you skip the project pipeline.
+> **Note:** `sdd_init_project` auto-generates this in agent files. Add manually only if you run Hoofy in MCP-only mode.
 
-<details>
-<summary><strong>Claude Code</strong> — <code>CLAUDE.md</code> (only needed for MCP-only setup)</summary>
+Put this in your tool-specific instruction file:
 
-> **Using the plugin?** Skip this — the plugin's hooks and agent already enforce SDD behavior automatically.
-
-```markdown
-## Hoofy — Spec-Driven Development
-
-Before coding any new feature or significant change, use Hoofy to create specs first.
-- New projects: use the SDD pipeline (sdd_init_project → sdd_validate, 9 stages)
-- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
-- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
-- Ad-hoc sessions: use sdd_suggest_context to find relevant specs/memory before starting
-- Code review: use sdd_review to verify implementation against specs, business rules, and ADRs
-- Spec audit: use sdd_audit to compare specs against actual code and find discrepancies
-- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>Cursor</strong> — <code>.cursor/rules/hoofy.md</code></summary>
+- Claude Code: `CLAUDE.md`
+- Cursor: `.cursor/rules/hoofy.md`
+- OpenCode: `AGENTS.md`
+- VS Code Copilot: `.github/copilot-instructions.md`
+- Gemini CLI: `GEMINI.md`
 
 ```markdown
 ## Hoofy — Spec-Driven Development
 
-Before coding any new feature or significant change, use Hoofy to create specs first.
-- New projects: use the SDD pipeline (sdd_init_project → sdd_validate, 9 stages)
-- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
-- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
-- Ad-hoc sessions: use sdd_suggest_context to find relevant specs/memory before starting
-- Code review: use sdd_review to verify implementation against specs, business rules, and ADRs
-- Spec audit: use sdd_audit to compare specs against actual code and find discrepancies
-- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
-Do NOT start coding without specs for any non-trivial change.
+Before coding any non-trivial change, use Hoofy specs first.
+- New projects: `sdd_init_project` -> full pipeline
+- Existing projects without specs: `sdd_reverse_engineer` -> `sdd_bootstrap`
+- Ongoing work: `sdd_change` (size/type adaptive)
+- Ad-hoc sessions: `sdd_suggest_context`
+- Reviews: `sdd_review`
+- Spec/code drift checks: `sdd_audit`
+- Memory: `mem_save`, `mem_session`
 ```
-</details>
-
-<details>
-<summary><strong>OpenCode</strong> — <code>AGENTS.md</code></summary>
-
-```markdown
-## Hoofy — Spec-Driven Development
-
-Before coding any new feature or significant change, use Hoofy to create specs first.
-- New projects: use the SDD pipeline (sdd_init_project → sdd_validate, 9 stages)
-- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
-- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
-- Ad-hoc sessions: use sdd_suggest_context to find relevant specs/memory before starting
-- Code review: use sdd_review to verify implementation against specs, business rules, and ADRs
-- Spec audit: use sdd_audit to compare specs against actual code and find discrepancies
-- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>VS Code Copilot</strong> — <code>.github/copilot-instructions.md</code></summary>
-
-```markdown
-## Hoofy — Spec-Driven Development
-
-Before coding any new feature or significant change, use Hoofy to create specs first.
-- New projects: use the SDD pipeline (sdd_init_project → sdd_validate, 9 stages)
-- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
-- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
-- Ad-hoc sessions: use sdd_suggest_context to find relevant specs/memory before starting
-- Code review: use sdd_review to verify implementation against specs, business rules, and ADRs
-- Spec audit: use sdd_audit to compare specs against actual code and find discrepancies
-- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
-
-<details>
-<summary><strong>Gemini CLI</strong> — <code>GEMINI.md</code></summary>
-
-```markdown
-## Hoofy — Spec-Driven Development
-
-Before coding any new feature or significant change, use Hoofy to create specs first.
-- New projects: use the SDD pipeline (sdd_init_project → sdd_validate, 9 stages)
-- Existing projects without specs: use sdd_reverse_engineer → sdd_bootstrap to generate artifacts
-- Ongoing work: use the change pipeline (sdd_change) — it adapts stages to the size of the change
-- Ad-hoc sessions: use sdd_suggest_context to find relevant specs/memory before starting
-- Code review: use sdd_review to verify implementation against specs, business rules, and ADRs
-- Spec audit: use sdd_audit to compare specs against actual code and find discrepancies
-- Memory: save decisions, bugs, and discoveries with mem_save so future sessions have context
-Do NOT start coding without specs for any non-trivial change.
-```
-</details>
 
 ---
 
